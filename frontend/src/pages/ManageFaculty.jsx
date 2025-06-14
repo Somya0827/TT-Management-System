@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import Heading from "../components/Heading";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaUserTie, FaSpinner, FaSearch } from "react-icons/fa";
+import { useUserRole } from "../context/UserRoleContext";
 
 const ManageFaculty = () => {
     const [faculties, setFaculties] = useState([]);
@@ -16,6 +17,7 @@ const ManageFaculty = () => {
         ID: "",
         Name: ""
     });
+    const { userRole } = useUserRole();
 
     const navigate = useNavigate();
 
@@ -207,10 +209,10 @@ const ManageFaculty = () => {
             <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <Heading text="Manage Faculty" />
-                        <p className="text-slate-600 mt-2 text-sm sm:text-base">
-                            Add, edit, and manage faculty members
-                        </p>
+                         <Heading text={userRole === "admin" ? "Manage Faculty" : "View Faculty "} />
+                          <p className="text-slate-600 mt-2 text-sm sm:text-base">
+                            {userRole === "admin" ? "Add, edit, and manage Faculty members" : "View Faculty members"}
+                           </p>
                     </div>
                     <button
                         onClick={() => navigate("/dashboard")}
@@ -237,6 +239,7 @@ const ManageFaculty = () => {
                             </div>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                          {userRole === 'admin' && (
                             <div className="relative w-full sm:w-64">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaSearch className="text-gray-400" />
@@ -249,6 +252,8 @@ const ManageFaculty = () => {
                                     className="pl-10 w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                                 />
                             </div>
+                          )}
+                            {userRole === "admin" && (
                             <button
                                 className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-sm font-medium"
                                 onClick={handleAddNewFaculty}
@@ -256,6 +261,7 @@ const ManageFaculty = () => {
                                 <FaPlus className="text-sm" />
                                 <span>Add Faculty</span>
                             </button>
+                            )}
                         </div>
                     </div>
 
@@ -265,7 +271,9 @@ const ManageFaculty = () => {
                             <thead>
                                 <tr className="bg-slate-800 text-white">
                                     <th className="px-6 py-4 text-left font-semibold">Faculty Name</th>
+                                    {userRole === "admin" && (
                                     <th className="px-6 py-4 text-center font-semibold">Actions</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -277,6 +285,7 @@ const ManageFaculty = () => {
                                         <td className="px-6 py-4">
                                             <div className="font-medium text-slate-800">{faculty.Name}</div>
                                         </td>
+                                        {userRole === "admin" && (
                                         <td className="px-6 py-4">
                                             <div className="flex justify-center space-x-2">
                                                 <button
@@ -295,6 +304,7 @@ const ManageFaculty = () => {
                                                 </button>
                                             </div>
                                         </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -310,6 +320,7 @@ const ManageFaculty = () => {
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="font-medium text-slate-800">{faculty.Name}</div>
+                                    {userRole === "admin" && (
                                     <div className="flex space-x-2">
                                         <button
                                             className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg transition-colors duration-200"
@@ -324,6 +335,7 @@ const ManageFaculty = () => {
                                             <FaTrash className="text-sm" />
                                         </button>
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -339,7 +351,7 @@ const ManageFaculty = () => {
                             <p className="text-slate-600 mb-4">
                                 {searchTerm ? "Try a different search term" : "Get started by adding your first faculty member."}
                             </p>
-                            {!searchTerm && (
+                            {!searchTerm && userRole === "admin" && (
                                 <button
                                     className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 mx-auto shadow-sm font-medium"
                                     onClick={handleAddNewFaculty}

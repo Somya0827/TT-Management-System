@@ -12,6 +12,7 @@ import {
 } from "react-icons/fa";
 import { SiBasicattentiontoken } from "react-icons/si";
 import { FaTableCells } from "react-icons/fa6";
+import { useUserRole } from "../context/UserRoleContext";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const Dashboard = () => {
     rooms: 0,
     courses: 0
   });
+    const { userRole } = useUserRole();
 
   const API_BASE_URL = "http://localhost:8080/api/v1";
   const API_ENDPOINTS = {
@@ -203,48 +205,53 @@ const Dashboard = () => {
       route: "/attencendance",
     },
     {
-      title: "View Calander",
-      description: "View timetable calander",
+      title: "View Calender",
+      description: "View timetable calender",
       icon: FaTableCells,
       iconColor: "bg-emerald-500",
       hoverColor: "hover:bg-emerald-50",
       route: "/view-timetable",
     },
     {
-      title: "Manage Courses",
-      description: "View existing courses",
+      title: userRole === "admin" ? "Manage Courses" : "View Courses",
+      description: userRole === "admin"
+    ? "Add, edit or remove Courses" : "View existing courses",
       icon: FaEdit,
       iconColor: "bg-amber-500",
       hoverColor: "hover:bg-amber-50",
       route: "/manage-courses",
     },
     {
-      title: "Manage Subjects",
-      description: "Add, edit or remove subjects",
+      title: userRole === "admin" ? "Manage Subjects" : "View Subjects",
+      description: userRole === "admin"
+    ? "Add, edit or remove subjects" : "View subjects information",
       icon: FaBook,
       iconColor: "bg-orange-500",
       hoverColor: "hover:bg-orange-50",
       route: "/manage-subjects",
     },
     {
-      title: "Manage Rooms",
-      description: "Configure room availability",
+      title: userRole === "admin" ? "Manage Rooms" : "View Rooms",
+      description: userRole === "admin"
+    ? "Configure room availability" : "View room availability",
       icon: FaDoorOpen,
       iconColor: "bg-purple-500",
       hoverColor: "hover:bg-purple-50",
       route: "/manage-rooms",
     },
     {
-      title: "Manage Faculty",
-      description: "Handle faculty information",
+      title: userRole === "admin" ? "Manage Faculty" : "View Faculty",
+      description: userRole === "admin"
+    ? "Handle faculty information" : "View faculty information",
       icon: FaUserTie,
       iconColor: "bg-indigo-500",
       hoverColor: "hover:bg-indigo-50",
       route: "/manage-faculty",
     },
     {
-      title: "Manage Batches",
-      description: "Organize batch details and schedules",
+      title: userRole === "admin" ? "Manage Batches" : "View Batches",
+      description: userRole === "admin"
+    ? "Organize batch details and schedules" : "View batch details and schedules",
       icon: FaLayerGroup,
       iconColor: "bg-green-500",
       hoverColor: "hover:bg-green-50",
@@ -276,10 +283,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header Section */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
-        <Heading text="Admin Dashboard" />
-        <p className="text-center text-slate-600 mt-2 text-sm sm:text-base">
-          Manage your academic scheduling system efficiently
-        </p>
+         <Heading text={userRole === "admin" ? "Admin Dashboard" : "Faculty Dashboard"} />
+      <p className="text-center text-slate-600 mt-2 text-sm sm:text-base">
+        {userRole === "admin" ? " Manage your academic scheduling system efficiently" : "View your academic scheduling system efficiently"}
+      </p>
       </div>
 
       {/* Error Alert */}

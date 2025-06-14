@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import Heading from "../components/Heading";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaBuilding, FaSpinner, FaSearch } from "react-icons/fa";
+import { useUserRole } from "../context/UserRoleContext";
 
 const ManageRooms = () => {
     const [rooms, setRooms] = useState([]);
@@ -17,6 +18,7 @@ const ManageRooms = () => {
         Name: "",
         Capacity: ""
     });
+    const { userRole } = useUserRole();
 
     const navigate = useNavigate();
 
@@ -213,10 +215,10 @@ const ManageRooms = () => {
             <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <Heading text="Manage Rooms" />
-                        <p className="text-slate-600 mt-2 text-sm sm:text-base">
-                            Add, edit, and manage rooms and their capacities
-                        </p>
+                        <Heading text={userRole === "admin" ? "Manage Rooms" : "View Rooms "} />
+                         <p className="text-slate-600 mt-2 text-sm sm:text-base">
+                           {userRole === "admin" ? "Add, edit, and manage room capacities" : "View rooms and their capacities"}
+                          </p>
                     </div>
                     <button
                         onClick={() => navigate("/dashboard")}
@@ -243,6 +245,7 @@ const ManageRooms = () => {
                             </div>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                          {userRole === 'admin' && (
                             <div className="relative w-full sm:w-64">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaSearch className="text-gray-400" />
@@ -255,6 +258,8 @@ const ManageRooms = () => {
                                     className="pl-10 w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                                 />
                             </div>
+                          )}
+                          {userRole === 'admin' && (
                             <button
                                 className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-sm font-medium"
                                 onClick={handleAddNewRoom}
@@ -262,6 +267,7 @@ const ManageRooms = () => {
                                 <FaPlus className="text-sm" />
                                 <span>Add Room</span>
                             </button>
+                          )}
                         </div>
                     </div>
 
@@ -272,7 +278,11 @@ const ManageRooms = () => {
                                 <tr className="bg-slate-800 text-white">
                                     <th className="px-6 py-4 text-left font-semibold">Room Name</th>
                                     <th className="px-6 py-4 text-left font-semibold">Capacity</th>
-                                    <th className="px-6 py-4 text-center font-semibold">Actions</th>
+                                   {userRole === "admin" && (
+                    <th className="px-6 py-4 text-center font-semibold w-1/4">
+                      Actions
+                    </th>
+                  )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -281,15 +291,16 @@ const ManageRooms = () => {
                                         key={`desktop-${room.ID}`}
                                         className="hover:bg-blue-50 transition-colors duration-150"
                                     >                                        
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 w-1/2">
                                             <div className="font-medium text-slate-800">{room.Name}</div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                         <td className="px-6 py-4 w-1/4">
                                             <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
                                                 {room.Capacity} seats
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        {userRole === "admin" && (
+                                       <td className="px-6 py-4 w-1/4">
                                             <div className="flex justify-center space-x-2">
                                                 <button
                                                     className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg transition-colors duration-200 shadow-sm"
@@ -307,6 +318,7 @@ const ManageRooms = () => {
                                                 </button>
                                             </div>
                                         </td>
+                                         )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -322,6 +334,7 @@ const ManageRooms = () => {
                             >
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="font-medium text-slate-800">{room.Name}</div>
+                                     {userRole === "admin" && (
                                     <div className="flex space-x-2">
                                         <button
                                             className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg transition-colors duration-200"
@@ -336,6 +349,7 @@ const ManageRooms = () => {
                                             <FaTrash className="text-sm" />
                                         </button>
                                     </div>
+                                     )}
                                 </div>
                                 <div className="text-sm text-slate-600">
                                     <span>{room.Capacity} seats</span>
@@ -354,7 +368,7 @@ const ManageRooms = () => {
                             <p className="text-slate-600 mb-4">
                                 {searchTerm ? "Try a different search term" : "Get started by adding your first room."}
                             </p>
-                            {!searchTerm && (
+                            {!searchTerm && userRole === "admin" && (
                                 <button
                                     className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 mx-auto shadow-sm font-medium"
                                     onClick={handleAddNewRoom}

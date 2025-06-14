@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import axios from "../services/api.js";
 import { useNavigate } from "react-router-dom";
 import backendService from "../services/backendservice.js";
+import { useUserRole } from '../context/UserRoleContext';
 
 const AuthContext = createContext();
 
@@ -11,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true); // if not needed then remove
   const navigate = useNavigate();
+  const { fetchUserRole } = useUserRole();
 
   const validateSession = async () => {
     try {
@@ -50,6 +52,7 @@ export const AuthProvider = ({ children }) => {
       console.log(data, res.status);
 
       if (res.status === 200) {
+        await fetchUserRole(username);
         navigate("/dashboard");
       }
     } catch (err) {
