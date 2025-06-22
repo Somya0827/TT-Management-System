@@ -53,6 +53,7 @@ func registerFacultyRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	r.GET("/batch/:id", controllers.Get[models.Batch](db))
 
 	r.GET("/lecture", controllers.FilteredLectures(db))
+	r.GET("/lecture/query", controllers.QueryLectures(db))
 	r.GET("/lecture/:id", controllers.Get[models.Lecture](db))
 
 	r.GET("/session", controllers.All[models.Session](db))
