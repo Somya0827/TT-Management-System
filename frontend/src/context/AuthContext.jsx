@@ -3,8 +3,6 @@ import axios from "../services/api.js";
 import { useNavigate } from "react-router-dom";
 import backendService from "../services/backendservice.js";
 import { useUserRole } from '../context/UserRoleContext';
-import { setCookie } from "../lib/cookie.ts";
-import { deleteCookie } from '../lib/cookie.ts';
 
 const AuthContext = createContext();
 
@@ -55,7 +53,6 @@ export const AuthProvider = ({ children }) => {
 
       if (res.status === 200) {
         await fetchUserRole(username);
-        setCookie('authToken', 'userAuthToken123', 1); // Set cookie on login
         navigate("/dashboard");
       }
     } catch (err) {
@@ -75,7 +72,6 @@ export const AuthProvider = ({ children }) => {
       });
       console.log(res.status);
       if (res.status == 200) {
-        deleteCookie('authToken');
         navigate("/");
       } else {
         console.error("Logout failed");

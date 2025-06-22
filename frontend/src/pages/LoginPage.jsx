@@ -5,7 +5,6 @@ import { CiLogin } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "..//assets/iips.png";
-import { getCookie } from "../lib/cookie.ts";
 
 
 const LoginPage = () => {
@@ -20,13 +19,6 @@ const LoginPage = () => {
     // console.log("Login attempted with:", username, password);
   };
 
-  useEffect(() => {
-    // Check if auth cookie exists
-    const authToken = getCookie('authToken');
-    if (authToken) {
-      navigate('/dashboard'); // Redirect to dashboard if logged in
-    }
-  }, [navigate]);
 
   const currentYear = new Date().getFullYear();
 
