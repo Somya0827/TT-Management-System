@@ -220,12 +220,12 @@ const ManageRooms = () => {
                            {userRole === "admin" ? "Add, edit, and manage room capacities" : "View rooms and their capacities"}
                           </p>
                     </div>
-                    <button
+                    {/* <button
                         onClick={() => navigate("/dashboard")}
                         className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-medium"
                     >
                         Back to Dashboard
-                    </button>
+                    </button> */}
                 </div>
             </div>
 

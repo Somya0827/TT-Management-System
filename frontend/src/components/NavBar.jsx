@@ -1,22 +1,27 @@
-import { FaCalendarAlt, FaUserCircle, FaSignOutAlt } from "react-icons/fa";
+import { FaUserCircle, FaSignOutAlt, FaArrowLeft } from "react-icons/fa";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import logo from "../assets/iips.png";
 
 export default function NavBar({ onLogout }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [username, setUsername] = useState("");
 
   const handleLogout = () => {
     onLogout();
-    // navigate("/");
   };
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
+  };
+
+  const handleNavigation = () => {
+    if (location.pathname === "/dashboard") return;
+    navigate("/dashboard");
   };
 
   useEffect(() => {
@@ -26,14 +31,33 @@ export default function NavBar({ onLogout }) {
     }
   }, []);
 
+  const showBackButton = location.pathname !== "/dashboard";
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 sm:h-20">
+          {/* Simplified Navigation Button with hover effects */}
+          {showBackButton && (
+            <button
+              onClick={handleNavigation}
+              className="flex items-center justify-center w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-2 
+                        rounded-full sm:rounded-lg 
+                        bg-transparent text-blue-600 hover:text-blue-800
+                        transition-colors duration-200 
+                        mr-2 group border border-white/95 hover:border-blue-200"
+              title="Go to Dashboard"
+            >
+              <FaArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline sm:ml-2 text-sm font-medium">
+               Back
+              </span>
+            </button>
+          )}
+
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-3">
+          <div className={`flex items-center space-x-3 ${showBackButton ? "flex-1" : ""}`}>
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-1.5 rounded-lg shadow-sm">
-              {/* <FaCalendarAlt className="text-white text-lg sm:text-xl" /> */}
               <img
                 src={logo}
                 alt="IIPS-LOGO"
@@ -50,6 +74,7 @@ export default function NavBar({ onLogout }) {
             </div>
           </div>
 
+          {/* Rest of your existing code... */}
           <div className="hidden md:flex items-center space-x-4">
             <div className="flex items-center space-x-3 bg-slate-50 rounded-lg px-4 py-2 border border-slate-200">
               <div className="bg-gradient-to-r from-slate-400 to-slate-600 p-2 rounded-full">
@@ -86,6 +111,7 @@ export default function NavBar({ onLogout }) {
         </div>
       </div>
 
+      {/* Mobile menu remains the same */}
       {menuOpen && (
         <div className="md:hidden absolute top-full right-0 bg-white border-b text-xs border-slate-200 shadow-lg rounded-b-2xl ">
           <div className="px-2 py-2 space-y-2 ">
