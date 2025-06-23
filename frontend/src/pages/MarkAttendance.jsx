@@ -340,14 +340,14 @@ function MarkAttendance() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center gap-2 sm:gap-4">
               {/* Back to Dashboard Button - Minimal Design */}
-              <button
+              {/* <button
                 onClick={() => window.history.back()}
                 className="flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-2 bg-gradient-to-l from-indigo-600 to-blue-600 border-1 text-white px-2 py-2 rounded-lg transition-colors duration-200 sm:rounded-lg group"
                 title="Back to Dashboard"
               >
                 <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline sm:ml-2 text-sm font-medium">Back</span>
-              </button>
+              </button> */}
 
               <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800 flex items-center gap-2 sm:gap-3">
                 {/* <Check className="w-8 h-8 sm:w-10 sm:h-10" /> */}

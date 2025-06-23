@@ -580,14 +580,14 @@ function ViewTimeTable() {
       <div className="max-w-7xl mx-auto">
         <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-lg p-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-            <button
+            {/* <button
               onClick={() => window.history.back()}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
               title="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm font-medium">Back</span>
-            </button>
+            </button> */}
 
             <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800 flex items-center gap-2 sm:gap-3">
               Attendance Calendar

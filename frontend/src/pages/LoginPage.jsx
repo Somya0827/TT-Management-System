@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { FaUser, FaCalendarAlt } from "react-icons/fa";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { CiLogin } from "react-icons/ci";
@@ -18,6 +18,7 @@ const LoginPage = () => {
     await login(username, password);
     // console.log("Login attempted with:", username, password);
   };
+
 
   const currentYear = new Date().getFullYear();
 
