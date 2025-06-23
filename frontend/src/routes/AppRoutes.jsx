@@ -15,6 +15,7 @@ import ManageCourses from "../pages/ManageCourses";
 import ManageFaculty from "../pages/ManageFaculty";
 import ManageBatches from "../pages/ManageBatches";
 import Attendence from "../pages/MarkAttendance";
+import ClassTimeTable from "../pages/ClassTimeTable";
 
 
 const AppRoutes = () => {
@@ -103,6 +104,15 @@ const AppRoutes = () => {
         element={
           //<PrivateRoute requiredRoles={["Admin"]}>
             <UpdateTimeTable/>
+          //</PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/class-timetable"
+        element={
+          //<PrivateRoute requiredRoles={["Admin", "Faculty"]}>
+            <ClassTimeTable />
           //</PrivateRoute>
         }
       />

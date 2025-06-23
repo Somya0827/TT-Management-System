@@ -8,7 +8,7 @@ import {
   FaPlus,
   FaEdit,
   FaUserTie, FaSpinner, FaExclamationTriangle,
-  FaLayerGroup,
+  FaLayerGroup, 
 } from "react-icons/fa";
 import { SiBasicattentiontoken } from "react-icons/si";
 import { FaTableCells } from "react-icons/fa6";
@@ -189,14 +189,6 @@ const Dashboard = () => {
 
   const actionCards = [
     {
-      title: "Create Table",
-      description: "Create new timetable schedules",
-      icon: FaPlus,
-      iconColor: "bg-blue-500",
-      hoverColor: "hover:bg-blue-50",
-      route: "/create-timetable",
-    },
-    {
       title: "Mark Attendence",
       description: "Mark the daily attendence",
       icon: SiBasicattentiontoken,
@@ -205,12 +197,28 @@ const Dashboard = () => {
       route: "/attencendance",
     },
     {
-      title: "View Calender",
+      title: "View Calenders",
       description: "View timetable calender",
       icon: FaTableCells,
       iconColor: "bg-emerald-500",
       hoverColor: "hover:bg-emerald-50",
       route: "/view-timetable",
+    },
+    {
+      title: "View All Timetables",
+      description: "Access class-specific timetables",
+      icon: FaTableCells,
+      iconColor: "bg-teal-500",
+      hoverColor: "hover:bg-teal-50",
+      route: "/class-timetable",
+    },
+    {
+      title: "Create Table",
+      description: "Create new timetable schedules",
+      icon: FaPlus,
+      iconColor: "bg-blue-500",
+      hoverColor: "hover:bg-blue-50",
+      route: "/create-timetable",
     },
     {
       title: userRole === "admin" ? "Manage Courses" : "View Courses",
