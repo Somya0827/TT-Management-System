@@ -7,89 +7,103 @@ import (
 	"tms-server/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func RegisterRoutes(r *gin.Engine) {
 	r.Use(middleware.CORSMiddleware())
 
-	role := middleware.RoleAuthMiddleware
 	db := config.DB
 	api := r.Group("/api/v1")
-	{
-		api.GET("/ping", controllers.Ping)
-		api.POST("/login", controllers.Login)
 
-		// INFO: Protected routes
-		api.Use(middleware.JWTAuthMiddleware())
-		api.POST("/logout", controllers.Logout)
-		course := api.Group("/course")
-		{
-			course.GET("", controllers.All[models.Course](db))
-			course.POST("", controllers.Create[models.Course](db))
-			course.GET("/:id", controllers.Get[models.Course](db))
-			course.PUT("/:id", controllers.Update[models.Course](db))
-			course.DELETE("/:id", controllers.Delete[models.Course](db))
-		}
-		subject := api.Group("/subject")
-		{
-			subject.GET("", controllers.All[models.Subject](db))
-			subject.POST("", controllers.Create[models.Subject](db))
-			subject.GET("/:id", controllers.Get[models.Subject](db))
-			subject.PUT("/:id", controllers.Update[models.Subject](db))
-			subject.DELETE("/:id", controllers.Delete[models.Subject](db))
-		}
-		faculty := api.Group("/faculty")
-		{
-			faculty.GET("", controllers.All[models.Faculty](db))
-			faculty.POST("", controllers.Create[models.Faculty](db))
-			faculty.GET("/:id", controllers.Get[models.Faculty](db))
-			faculty.PUT("/:id", controllers.Update[models.Faculty](db))
-			faculty.DELETE("/:id", controllers.Delete[models.Faculty](db))
-		}
-		room := api.Group("/room")
-		{
-			room.GET("", controllers.All[models.Room](db))
-			room.POST("", controllers.Create[models.Room](db))
-			room.GET("/:id", controllers.Get[models.Room](db))
-			room.PUT("/:id", controllers.Update[models.Room](db))
-			room.DELETE("/:id", controllers.Delete[models.Room](db))
-		}
-		batch := api.Group("/batch")
-		{
-			batch.GET("", controllers.All[models.Batch](db))
-			batch.POST("", controllers.Create[models.Batch](db))
-			batch.GET("/:id", controllers.Get[models.Batch](db))
-			batch.PUT("/:id", controllers.Update[models.Batch](db))
-			batch.DELETE("/:id", controllers.Delete[models.Batch](db))
-		}
-		user := api.Group("/user")
-		{
-			user.GET("", role("superadmin"), controllers.All[models.User](db))
-			user.POST("", controllers.Create[models.User](db))
-			user.GET("/:id", controllers.Get[models.User](db))
-			user.PUT("/:id", controllers.Update[models.User](db))
-			user.DELETE("/:id", controllers.Delete[models.User](db))
-		}
-		lecture := api.Group("/lecture")
-		{
-			lecture.GET("", controllers.FilteredLectures(db))
-			lecture.POST("", controllers.Create[models.Lecture](db))
-			lecture.GET("/:id", controllers.Get[models.Lecture](db))
-			lecture.PUT("/:id", controllers.Update[models.Lecture](db))
-			lecture.DELETE("/:id", controllers.Delete[models.Lecture](db))
-		}
-		session := api.Group("/session")
-		{
-			session.GET("", controllers.All[models.Session](db))
-			session.POST("", controllers.Create[models.Session](db))
-			session.GET("/:id", controllers.Get[models.Session](db))
-			session.PUT("/:id", controllers.Update[models.Session](db))
-			session.DELETE("/:id", controllers.Delete[models.Session](db))
-		}
-		calendar := api.Group("/calendar")
-		{
-			calendar.GET("", controllers.GetCalendarSummaryByMonth)
-			calendar.GET("/day", controllers.GetLectureDetailsByDate)
-		}
-	}
+	// Public routes
+	api.GET("/ping", controllers.Ping)
+	api.POST("/login", controllers.Login)
+
+	// Protected routes (faculty+)
+	api.Use(middleware.JWTAuthMiddleware())
+	api.POST("/logout", controllers.Logout)
+	registerFacultyRoutes(api, db)
+
+	// Admin-only routes
+	admin := api.Group("/")
+	admin.Use(middleware.RoleAuthMiddleware("admin", "superadmin"))
+	registerAdminRoutes(admin, db)
+
+	// Superadmin-only routes
+	super := api.Group("/")
+	super.Use(middleware.RoleAuthMiddleware("superadmin"))
+	registerSuperAdminRoutes(super, db)
+}
+
+func registerFacultyRoutes(r *gin.RouterGroup, db *gorm.DB) {
+	r.GET("/course", controllers.All[models.Course](db))
+	r.GET("/course/:id", controllers.Get[models.Course](db))
+
+	r.GET("/subject", controllers.All[models.Subject](db))
+	r.GET("/subject/:id", controllers.Get[models.Subject](db))
+
+	r.GET("/faculty", controllers.All[models.Faculty](db))
+	r.GET("/faculty/:id", controllers.Get[models.Faculty](db))
+
+	r.GET("/room", controllers.All[models.Room](db))
+	r.GET("/room/:id", controllers.Get[models.Room](db))
+
+	r.GET("/batch", controllers.All[models.Batch](db))
+	r.GET("/batch/:id", controllers.Get[models.Batch](db))
+
+	r.GET("/lecture", controllers.QueryLectures(db)) // for backwards compatibility, use /query
+	r.GET("/lecture/query", controllers.QueryLectures(db))
+	r.GET("/lecture/:id", controllers.Get[models.Lecture](db))
+
+	r.GET("/session", controllers.All[models.Session](db))
+	r.GET("/session/:id", controllers.Get[models.Session](db))
+
+	r.GET("/calendar", controllers.GetCalendarSummaryByMonth)
+	r.GET("/calendar/day", controllers.GetLectureDetailsByDate)
+}
+
+func registerAdminRoutes(r *gin.RouterGroup, db *gorm.DB) {
+	// Course
+	r.POST("/course", controllers.Create[models.Course](db))
+	r.PUT("/course/:id", controllers.Update[models.Course](db))
+	r.DELETE("/course/:id", controllers.Delete[models.Course](db))
+
+	// Subject
+	r.POST("/subject", controllers.Create[models.Subject](db))
+	r.PUT("/subject/:id", controllers.Update[models.Subject](db))
+	r.DELETE("/subject/:id", controllers.Delete[models.Subject](db))
+
+	// Faculty
+	r.POST("/faculty", controllers.Create[models.Faculty](db))
+	r.PUT("/faculty/:id", controllers.Update[models.Faculty](db))
+	r.DELETE("/faculty/:id", controllers.Delete[models.Faculty](db))
+
+	// Room
+	r.POST("/room", controllers.Create[models.Room](db))
+	r.PUT("/room/:id", controllers.Update[models.Room](db))
+	r.DELETE("/room/:id", controllers.Delete[models.Room](db))
+
+	// Batch
+	r.POST("/batch", controllers.Create[models.Batch](db))
+	r.PUT("/batch/:id", controllers.Update[models.Batch](db))
+	r.DELETE("/batch/:id", controllers.Delete[models.Batch](db))
+
+	// Lecture
+	r.POST("/lecture", controllers.Create[models.Lecture](db))
+	r.PUT("/lecture/:id", controllers.Update[models.Lecture](db))
+	r.DELETE("/lecture/:id", controllers.Delete[models.Lecture](db))
+
+	// Session
+	r.POST("/session", controllers.Create[models.Session](db))
+	r.PUT("/session/:id", controllers.Update[models.Session](db))
+	r.DELETE("/session/:id", controllers.Delete[models.Session](db))
+}
+
+func registerSuperAdminRoutes(r *gin.RouterGroup, db *gorm.DB) {
+	r.GET("/user", controllers.All[models.User](db))
+	r.POST("/user", controllers.Create[models.User](db))
+	r.GET("/user/:id", controllers.Get[models.User](db))
+	r.PUT("/user/:id", controllers.Update[models.User](db))
+	r.DELETE("/user/:id", controllers.Delete[models.User](db))
 }
