@@ -52,7 +52,7 @@ func registerFacultyRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	r.GET("/batch", controllers.All[models.Batch](db))
 	r.GET("/batch/:id", controllers.Get[models.Batch](db))
 
-	r.GET("/lecture", controllers.FilteredLectures(db))
+	r.GET("/lecture", controllers.QueryLectures(db)) // for backwards compatibility, use /query
 	r.GET("/lecture/query", controllers.QueryLectures(db))
 	r.GET("/lecture/:id", controllers.Get[models.Lecture](db))
 
