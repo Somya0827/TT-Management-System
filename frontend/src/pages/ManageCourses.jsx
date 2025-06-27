@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Heading from "../components/Heading";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaGraduationCap, FaSpinner, FaSearch } from "react-icons/fa";
 import { useUserRole } from "../context/UserRoleContext";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ManageCourses = () => {
     const [courses, setCourses] = useState([]);
@@ -144,7 +146,7 @@ const ManageCourses = () => {
 
     const handleSaveCourse = async () => {
         if (!newCourse.name.trim() || !newCourse.code.trim()) {
-            alert('Please fill in all required fields');
+            toast.error('Please fill in all required fields');
             return;
         }
 
@@ -183,20 +185,46 @@ const ManageCourses = () => {
             await fetchCourses();
             resetForm();
             setShowAddDialog(false);
+            toast.success(`Course ${editingCourse ? 'updated' : 'added'} successfully!`);
 
         } catch (err) {
             console.error(`Error ${editingCourse ? 'updating' : 'adding'} course:`, err);
-            alert(`Failed to ${editingCourse ? 'update' : 'add'} course: ${err.message}`);
+            toast.error(`Failed to ${editingCourse ? 'update' : 'add'} course: ${err.message}`);
         } finally {
             setAddingCourse(false);
             setEditingCourse(false);
         }
     };
-
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this course? This action cannot be undone.")) {
-            return;
-        }
+        toast.info(
+            <div>
+                <div className="mb-2">Are you sure you want to delete this course?</div>
+                <div className="flex justify-end space-x-2 mt-2">
+                    <button 
+                        onClick={() => {
+                            toast.dismiss();
+                            performDelete(id);
+                        }}
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                        Delete
+                    </button>
+                    <button 
+                        onClick={() => toast.dismiss()} 
+                        className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>,
+            {
+                autoClose: false,
+                closeButton: false,
+                position: 'top-center',
+            }
+        );
+    };
+    const performDelete = async (id) => {
 
         try {
             const response = await fetch(API_ENDPOINTS.DELETE_COURSE(id), {
@@ -213,10 +241,11 @@ const ManageCourses = () => {
 
             setCourses(courses.filter(course => course.ID !== id));
             setFilteredCourses(filteredCourses.filter(course => course.ID !== id));
+            toast.success("Courses Deleted Successfully");
 
         } catch (err) {
             console.error('Error deleting course:', err);
-            alert(`Failed to delete course: ${err.message}`);
+            toast.error(`Failed to delete course: ${err.message}`);
         }
     };
 
@@ -293,6 +322,16 @@ const ManageCourses = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            <ToastContainer 
+                    position="top-right"
+                    autoClose={3000}
+                    hideProgressBar={false}
+                    newestOnTop={false}
+                    closeOnClick
+                    pauseOnFocusLoss
+                    draggable
+                    pauseOnHover
+                />
             {/* Header Section */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
