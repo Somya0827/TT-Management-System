@@ -266,6 +266,62 @@ const Dashboard = () => {
       route: "/manage-batches",
     },
   ];
+  const facultyCards = [
+
+    {
+      title: "View All Timetables",
+      description: "Access class-specific timetables",
+      icon: FaTableCells,
+      iconColor: "bg-teal-500",
+      hoverColor: "hover:bg-teal-50",
+      route: "/class-timetable",
+    },
+    {
+      title: userRole === "admin" ? "Manage Courses" : "View Courses",
+      description: userRole === "admin"
+    ? "Add, edit or remove Courses" : "View existing courses",
+      icon: FaEdit,
+      iconColor: "bg-amber-500",
+      hoverColor: "hover:bg-amber-50",
+      route: "/manage-courses",
+    },
+    {
+      title: userRole === "admin" ? "Manage Subjects" : "View Subjects",
+      description: userRole === "admin"
+    ? "Add, edit or remove subjects" : "View subjects information",
+      icon: FaBook,
+      iconColor: "bg-orange-500",
+      hoverColor: "hover:bg-orange-50",
+      route: "/manage-subjects",
+    },
+    {
+      title: userRole === "admin" ? "Manage Rooms" : "View Rooms",
+      description: userRole === "admin"
+    ? "Configure room availability" : "View room availability",
+      icon: FaDoorOpen,
+      iconColor: "bg-purple-500",
+      hoverColor: "hover:bg-purple-50",
+      route: "/manage-rooms",
+    },
+    {
+      title: userRole === "admin" ? "Manage Faculty" : "View Faculty",
+      description: userRole === "admin"
+    ? "Handle faculty information" : "View faculty information",
+      icon: FaUserTie,
+      iconColor: "bg-indigo-500",
+      hoverColor: "hover:bg-indigo-50",
+      route: "/manage-faculty",
+    },
+    {
+      title: userRole === "admin" ? "Manage Batches" : "View Batches",
+      description: userRole === "admin"
+    ? "Organize batch details and schedules" : "View batch details and schedules",
+      icon: FaLayerGroup,
+      iconColor: "bg-green-500",
+      hoverColor: "hover:bg-green-50",
+      route: "/manage-batches",
+    },
+  ];
 
   const handleRetry = () => {
     window.location.reload();
@@ -353,7 +409,48 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
-          {actionCards.map((card, index) => (
+          {userRole === "admin" ? actionCards.map((card, index) => (
+            <div
+              key={index}
+              onClick={() => navigate(card.route)}
+              className={`bg-white rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border border-slate-200 ${card.hoverColor} group`}
+            >
+              <div className="flex items-start space-x-4">
+                <div
+                  className={`${card.iconColor} p-3 rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-200`}
+                >
+                  <card.icon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-slate-800 mb-1 group-hover:text-slate-900">
+                    {card.title}
+                  </h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    {card.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Hover indicator */}
+              <div className="mt-4 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div className="text-slate-400 text-xs flex items-center">
+                  Click to access
+                  <svg
+                    className="w-3 h-3 ml-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>)) : facultyCards.map((card, index) => (
             <div
               key={index}
               onClick={() => navigate(card.route)}

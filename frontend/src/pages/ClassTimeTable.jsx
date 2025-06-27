@@ -27,11 +27,11 @@ const ClassTimeTable = () => {
 
   // State for the selected filter criteria by the user
   const [selectedFilters, setSelectedFilters] = useState({
-    course: undefined,
-    batch: undefined,
-    semester: undefined,
-    faculty: undefined,
-    room: undefined
+    course: null,
+    batch: null,
+    semester: null,
+    faculty: null,
+    room: null
   });
 
   // State for loading and error handling
@@ -51,6 +51,7 @@ const ClassTimeTable = () => {
     GET_FACULTY: `${API_BASE_URL}/faculty`,
     GET_ROOM: `${API_BASE_URL}/room`,
     LECTURE: `${API_BASE_URL}/lecture`,
+    LECTURE_QUERY: `${API_BASE_URL}/lecture/query`,
   };
 
   // Effect to fetch initial data (courses, batches, etc.) on component mount
@@ -114,7 +115,7 @@ const ClassTimeTable = () => {
     }
   };
 
-   const fetchSubjects = async () => {
+  const fetchSubjects = async () => {
     try {
       const response = await fetch(API_ENDPOINTS.GET_SUBJECT, {
         method: 'GET',
@@ -180,14 +181,28 @@ const ClassTimeTable = () => {
     try {
       // Find the selected objects based on their names
       const selectedCourse = courses.find(c => c.Name === selectedFilters.course);
-      const selectedBatch = batches.find(b => b.Year === selectedFilters.batch);
+      const selectedBatch = batches.find(b => `${b.Year}-${b.Section}` === selectedFilters.batch);
       const selectedFaculty = faculties.find(f => f.Name === selectedFilters.faculty);
       const selectedRoom = rooms.find(r => r.Name === selectedFilters.room);
       const semesterNumber = selectedFilters.semester !== undefined ? romanToInteger(selectedFilters.semester) : undefined;
 
+      // Build query parameters based on selected filters
+      const queryParams = new URLSearchParams();
 
-      // Fetch all lectures without parameters (similar to CreateTable.jsx)
-      const response = await fetch(API_ENDPOINTS.LECTURE, {
+      if (selectedFaculty) {
+        queryParams.append('faculty_id', selectedFaculty.ID);
+      } else if (selectedRoom) {
+        queryParams.append('room_id', selectedRoom.ID);
+      } else if (selectedBatch && semesterNumber !== undefined) {
+        queryParams.append('batch_id', selectedBatch.ID);
+        queryParams.append('semester', semesterNumber);
+        if (selectedBatch.Section) {
+          queryParams.append('section', selectedBatch.Section);
+        }
+      }
+
+      // Fetch lectures with query parameters
+      const response = await fetch(`${API_ENDPOINTS.LECTURE_QUERY}?${queryParams}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
@@ -200,33 +215,7 @@ const ClassTimeTable = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       } else {
-        const allLectures = await response.json();
-        let filteredLectures = [];
-
-        // Filter lectures based on selected criteria (similar to loadExistingLectures in CreateTable.jsx)
-        if (selectedFaculty) {
-          // Filter by Faculty ID
-          filteredLectures = allLectures.filter(lecture =>
-            lecture.FacultyID === selectedFaculty.ID
-          );
-          console.log('Filtered lectures for faculty:', selectedFaculty.Name, filteredLectures);
-        } 
-        else if (selectedRoom) {
-          // Filter by Room ID
-          filteredLectures = allLectures.filter(lecture =>
-            lecture.RoomID === selectedRoom.ID
-          );
-          console.log('Filtered lectures for room:', selectedRoom.Name, filteredLectures);
-        } 
-        else if (selectedBatch && semesterNumber !== undefined) {
-          // Filter by Batch ID and Semester
-          filteredLectures = allLectures.filter(lecture =>
-            lecture.BatchID === selectedBatch.ID &&
-            lecture.Semester === semesterNumber
-          );
-          console.log('Filtered lectures for batch:', selectedBatch.Year, 'semester:', semesterNumber, filteredLectures);
-        }
-
+        const filteredLectures = await response.json();
         setLectures(filteredLectures);
       }
     } catch (err) {
@@ -238,112 +227,114 @@ const ClassTimeTable = () => {
     }
   };
 
-  // --- Handlers for Select Changes ---
   // These handlers update the selectedFilters state
   const handleCourseChange = (value) => {
     setSelectedFilters({
-      course: value,
-      batch: undefined,
-      semester: undefined,
-      faculty: undefined,
-      room: undefined
+      course: value === "placeholder" ? null : value,
+      batch: null,
+      semester: null,
+      faculty: null,
+      room: null
     });
   };
 
-  const handleBatchChange = (value) => {
-    setSelectedFilters(prevFilters => ({
-      ...prevFilters,
-      batch: value,
-      semester: undefined,
-      faculty: undefined,
-      room: undefined
-    }));
-  };
+const handleBatchChange = (value) => {
+  setSelectedFilters(prev => ({
+    ...prev,
+    batch: value === "placeholder" ? null : value,
+    semester: null,
+    faculty: null,
+    room: null
+  }));
+};
 
-  const handleSemesterChange = (value) => {
-    setSelectedFilters(prevFilters => ({
-      ...prevFilters,
-      semester: value,
-      faculty: undefined,
-      room: undefined
-    }));
-  };
+const handleSemesterChange = (value) => {
+  setSelectedFilters(prev => ({
+    ...prev,
+    semester: value === "placeholder" ? null : value,
+    faculty: null,
+    room: null
+  }));
+};
 
-  const handleFacultyChange = (value) => {
-     // When faculty is selected, reset other main filters
-    setSelectedFilters({
-      faculty: value,
-      course: undefined,
-      batch: undefined,
-      semester: undefined,
-      room: undefined
-    });
-  };
+const handleFacultyChange = (value) => {
+  setSelectedFilters({
+    faculty: value === "placeholder" ? null : value,
+    course: null,
+    batch: null,
+    semester: null,
+    room: null
+  });
+};
 
-  const handleRoomChange = (value) => {
-     // When room is selected, reset other main filters
-    setSelectedFilters({
-      room: value,
-      course: undefined,
-      batch: undefined,
-      semester: undefined,
-      faculty: undefined
-    });
-  };
+const handleRoomChange = (value) => {
+  setSelectedFilters({
+    room: value === "placeholder" ? null : value,
+    course: null,
+    batch: null,
+    semester: null,
+    faculty: null
+  });
+};
 
   // --- Button Handlers ---
-   const handleGenerateTimetable = () => {
-       // Allow fetching if faculty or room is selected OR if course+batch+semester are selected
-       if (selectedFilters.faculty !== undefined || 
-           selectedFilters.room !== undefined || 
-           (selectedFilters.course !== undefined && 
-            selectedFilters.batch !== undefined && 
-            selectedFilters.semester !== undefined)) {
-           fetchLectures();
-       } else {
-           alert("Please select either Faculty, Room, or complete Course+Batch+Semester combination to generate timetable.");
-       }
-   };
+  const handleGenerateTimetable = () => {
+    // Allow fetching if faculty or room is selected OR if course+batch+semester are selected
+    if (selectedFilters.faculty !== undefined ||
+      selectedFilters.room !== undefined ||
+      (selectedFilters.course !== undefined &&
+        selectedFilters.batch !== undefined &&
+        selectedFilters.semester !== undefined)) {
+      fetchLectures();
+    } else {
+      alert("Please select either Faculty, Room, or complete Course+Batch+Semester combination to generate timetable.");
+    }
+  };
 
-   const handleReset = () => {
-       // Reset all filters and clear the displayed timetable
-       setSelectedFilters({
-           course: undefined,
-           batch: undefined,
-           semester: undefined,
-           faculty: undefined,
-           room: undefined
-       });
-       setLectures([]);
-   };
+  const handleReset = () => {
+    setSelectedFilters({
+      course: null,
+      batch: null,
+      semester: null,
+      faculty: null,
+      room: null
+    });
+    setLectures([]);
+  };
 
 
   // --- Filtering Options for Dropdowns ---
   const getFilteredBatches = () => {
-    if (selectedFilters.course === undefined) return [];
+    if (!selectedFilters.course) return [];
     const selectedCourse = courses.find(course => course.Name === selectedFilters.course);
     if (!selectedCourse) return [];
-    return batches.filter(batch => batch.CourseID === selectedCourse.ID);
+
+    return batches
+      .filter(batch => batch.CourseID === selectedCourse.ID)
+      .sort((a, b) => {
+        if (a.Year !== b.Year) return a.Year - b.Year;
+        return a.Section.localeCompare(b.Section);
+      });
   };
 
   const getFilteredSemesters = () => {
-     // Filter semesters based on selected course and batch if necessary
-     // Assuming semesters are linked to batches or courses in academicData
-      if (selectedFilters.course === undefined || selectedFilters.batch === undefined) return semesters;
-      // Add logic to filter semesters based on selected course and batch if needed
-      return semesters; // Return all semesters for now if no specific filtering logic exists
+    // Filter semesters based on selected course and batch if necessary
+    // Assuming semesters are linked to batches or courses in academicData
+    if (selectedFilters.course === undefined || selectedFilters.batch === undefined) return semesters;
+    // Add logic to filter semesters based on selected course and batch if needed
+    return semesters; // Return all semesters for now if no specific filtering logic exists
   };
 
   const getFilteredFaculties = () => {
-      // Filter faculties based on selected course, batch, semester if necessary
-      // For now, return all faculties
-      return faculties;
+    // Filter faculties based on selected course, batch, semester if necessary
+    // For now, return all faculties
+    return faculties;
   };
 
-   const getFilteredRooms = () => {
-      // Filter rooms based on selected course, batch, semester if necessary
-      // For now, return all rooms
-      return rooms;
+  const getFilteredRooms = () => {
+    // Filter rooms based on selected course, batch, semester if necessary
+    // For now, return all rooms
+    return rooms;
   };
 
 
@@ -372,7 +363,7 @@ const ClassTimeTable = () => {
       } else if (current) {
         result += current;
       } else {
-          console.warn(`Invalid Roman numeral character: ${romanStr[i]}`);
+        console.warn(`Invalid Roman numeral character: ${romanStr[i]}`);
       }
     }
 
@@ -446,155 +437,188 @@ const ClassTimeTable = () => {
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Course Select */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Course</label>
-                <Select value={selectedFilters.course} onValueChange={handleCourseChange}>
-                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select course" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                     <SelectItem value={undefined}>Select course</SelectItem>
-                    {courses.map((course) => (
-                      <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{course.Name}</span>
-                          {course.Code && (
-                            <span className="text-xs text-gray-500">{course.Code}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+<div className="p-6">
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    {/* Course Select */}
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">Course</label>
+      <Select
+        value={selectedFilters.course ?? ""}
+        onValueChange={handleCourseChange}
+      >
+        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+          <SelectValue placeholder="Select course" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-2 shadow-lg">
+          <SelectItem value="placeholder">Select course</SelectItem>
+          {courses.map((course) => (
+            <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
+              <div className="flex flex-col">
+                <span className="font-medium">{course.Name}</span>
+                {course.Code && (
+                  <span className="text-xs text-gray-500">{course.Code}</span>
+                )}
               </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-              {/* Batch Select */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Batch</label>
-                <Select value={selectedFilters.batch} onValueChange={handleBatchChange} disabled={selectedFilters.course === undefined}>
-                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select batch" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                     <SelectItem value={undefined}>Select batch</SelectItem>
-                    {getFilteredBatches().map((batch) => (
-                      <SelectItem key={batch.ID} value={batch.Year} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{batch.Year}</span>
-                          {batch.Section && (
-                            <span className="text-xs text-gray-500">Section: {batch.Section}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    {/* Batch Select */}
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">Batch</label>
+      <Select
+        disabled={!selectedFilters.course || loading}
+        value={selectedFilters.batch ?? ""}
+        onValueChange={handleBatchChange}
+      >
+        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+          <SelectValue placeholder="Select batch" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-2 shadow-lg">
+          <SelectItem value="placeholder">Select batch</SelectItem>
+          {getFilteredBatches().map((batch) => (
+            <SelectItem
+              key={batch.ID}
+              value={`${batch.Year}-${batch.Section}`}
+              className="rounded-lg"
+            >
+              <div className="flex flex-col">
+                <span className="font-medium">Batch {batch.Year} - Section {batch.Section}</span>
+                {batch.Course?.Name && (
+                  <span className="text-xs text-gray-500">{batch.Course.Name}</span>
+                )}
               </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-              {/* Semester Select */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Semester</label>
-                 <Select value={selectedFilters.semester} onValueChange={handleSemesterChange} disabled={selectedFilters.batch === undefined}>
-                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select semester" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                     <SelectItem value={undefined}>Select semester</SelectItem>
-                    {getFilteredSemesters().map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id || semester.number?.toString()} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{semester.id || semester.number}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    {/* Semester Select */}
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">Semester</label>
+      <Select
+        value={selectedFilters.semester ?? ""}
+        onValueChange={handleSemesterChange}
+        disabled={!selectedFilters.batch}
+      >
+        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+          <SelectValue placeholder="Select semester" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-2 shadow-lg">
+          <SelectItem value="placeholder">Select semester</SelectItem>
+          {getFilteredSemesters().map((semester) => (
+            <SelectItem
+              key={semester.id}
+              value={semester.id || semester.number?.toString()}
+              className="rounded-lg"
+            >
+              <div className="flex flex-col">
+                <span className="font-medium">{semester.id || semester.number}</span>
               </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-               {/* Faculty Select */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Faculty</label>
-                <Select value={selectedFilters.faculty} onValueChange={handleFacultyChange} disabled={loading}>
-                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select faculty" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                     <SelectItem value={undefined}>Select faculty</SelectItem>
-                    {getFilteredFaculties().map((faculty) => (
-                      <SelectItem key={faculty.ID} value={faculty.Name} className="rounded-lg">
-                         <div className="flex flex-col">
-                            <span className="font-medium">{faculty.Name}</span>
-                            {faculty.Email && (
-                              <span className="text-xs text-gray-500">{faculty.Email}</span>
-                            )}
-                          </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    {/* Faculty Select */}
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">Faculty</label>
+      <Select
+        value={selectedFilters.faculty ?? ""}
+        onValueChange={handleFacultyChange}
+        disabled={loading}
+      >
+        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+          <SelectValue placeholder="Select faculty" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-2 shadow-lg">
+          <SelectItem value="placeholder">Select faculty</SelectItem>
+          {getFilteredFaculties().map((faculty) => (
+            <SelectItem
+              key={faculty.ID}
+              value={faculty.Name}
+              className="rounded-lg"
+            >
+              <div className="flex flex-col">
+                <span className="font-medium">{faculty.Name}</span>
+                {faculty.Email && (
+                  <span className="text-xs text-gray-500">{faculty.Email}</span>
+                )}
               </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-              {/* Room Select */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Room</label>
-                 <Select value={selectedFilters.room} onValueChange={handleRoomChange} disabled={loading}>
-                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select room" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value={undefined}>Select room</SelectItem>
-                    {getFilteredRooms().map((room) => (
-                      <SelectItem key={room.ID} value={room.Name} className="rounded-lg">
-                         <div className="flex flex-col">
-                            <span className="font-medium">{room.Name}</span>
-                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    {/* Room Select */}
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">Room</label>
+      <Select
+        value={selectedFilters.room ?? ""}
+        onValueChange={handleRoomChange}
+        disabled={loading}
+      >
+        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+          <SelectValue placeholder="Select room" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-2 shadow-lg">
+          <SelectItem value="placeholder">Select room</SelectItem>
+          {getFilteredRooms().map((room) => (
+            <SelectItem
+              key={room.ID}
+              value={room.Name}
+              className="rounded-lg"
+            >
+              <div className="flex flex-col">
+                <span className="font-medium">{room.Name}</span>
               </div>
-            </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
 
-             {/* Generate Timetable and Reset Buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Button
-                 className={clsx(
-                   "w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300",
-                   {
-                     "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white transform hover:scale-[1.02]":
-                       selectedFilters.course !== undefined && selectedFilters.batch !== undefined && selectedFilters.semester !== undefined && !loading && !isLoadingLectures,
-                     "bg-gray-200 text-gray-500 cursor-not-allowed":
-                       selectedFilters.course === undefined || selectedFilters.batch === undefined || selectedFilters.semester === undefined || loading || isLoadingLectures,
-                   }
-                 )}
-                onClick={handleGenerateTimetable}
-                disabled={
-                  (selectedFilters.course === undefined || 
-                   selectedFilters.batch === undefined || 
-                   selectedFilters.semester === undefined) && 
-                  selectedFilters.faculty === undefined && 
-                  selectedFilters.room === undefined || 
-                  loading || 
-                  isLoadingLectures
-                }
-              >
-                 Generate Timetable
-              </Button>
-               <Button
-                className="w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300 bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center gap-2"
-                onClick={handleReset}
-                disabled={loading || isLoadingLectures}
-              >
-                <RefreshCcw size={18} />
-                Reset
-              </Button>
-            </div>
-
-
-          </div>
+  {/* Generate Timetable and Reset Buttons */}
+  <div className="mt-8 flex flex-col sm:flex-row gap-4">
+    <Button
+      className={clsx(
+        "w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300",
+        {
+          "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white transform hover:scale-[1.02]":
+            (selectedFilters.course && selectedFilters.batch && selectedFilters.semester) ||
+            selectedFilters.faculty ||
+            selectedFilters.room,
+          "bg-gray-200 text-gray-500 cursor-not-allowed":
+            !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
+            !selectedFilters.faculty &&
+            !selectedFilters.room
+        }
+      )}
+      onClick={handleGenerateTimetable}
+      disabled={
+        !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
+        !selectedFilters.faculty &&
+        !selectedFilters.room
+      }
+    >
+      Generate Timetable
+    </Button>
+    <Button
+      className="w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300 bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center gap-2"
+      onClick={handleReset}
+      disabled={loading || isLoadingLectures}
+    >
+      <RefreshCcw size={18} />
+      Reset
+    </Button>
+  </div>
+</div>
         </div>
       </div>
 
@@ -739,15 +763,15 @@ const ClassTimeTable = () => {
 
       {/* Display message based on selection state */}
       {!isLoadingLectures && lectures.length === 0 && (
-          <div className="flex justify-center items-center py-8">
-             <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-md mx-4">
-               {selectedFilters.course !== undefined || selectedFilters.batch !== undefined || selectedFilters.semester !== undefined || selectedFilters.faculty !== undefined || selectedFilters.room !== undefined ? (
-                 <p className="text-gray-700 font-medium">No timetable found for the selected criteria.</p>
-               ) : (
-                  <p className="text-gray-700 font-medium">Please select criteria to view timetable.</p>
-               )}
-             </div>
-           </div>
+        <div className="flex justify-center items-center py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-md mx-4">
+            {selectedFilters.course || selectedFilters.batch || selectedFilters.semester || selectedFilters.faculty || selectedFilters.room ? (
+              <p className="text-gray-700 font-medium">No timetable found for the selected criteria.</p>
+            ) : (
+              <p className="text-gray-700 font-medium">Please select criteria to view timetable.</p>
+            )}
+          </div>
+        </div>
       )}
 
     </div>
