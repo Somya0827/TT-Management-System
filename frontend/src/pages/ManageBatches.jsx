@@ -14,6 +14,16 @@ import {
 import { useUserRole } from "../context/UserRoleContext";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+const toastCustomStyles = `
+  @media (max-width: 480px) {
+    .Toastify__toast {
+      margin: 20px ;
+      width: calc(100% - 40px);
+      padding: 14px ;
+      border-radius: 8px; 
+    }
+  }
+`;
 
 const ManageBatches = () => {
   const [batches, setBatches] = useState([]);
@@ -204,7 +214,8 @@ const ManageBatches = () => {
       {
         autoClose: false,
         closeButton: false,
-        position: 'top-center',
+        position:  'top-right',
+        // className: 'mt-4 my-2 sm:mt-2 mx-2', // Responsive margins
       }
     );
   };
@@ -295,6 +306,7 @@ const ManageBatches = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+       <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
       <ToastContainer 
         position="top-right"
         autoClose={3000}
@@ -303,7 +315,7 @@ const ManageBatches = () => {
         closeOnClick
         pauseOnFocusLoss
         draggable
-        pauseOnHover
+        pauseOnHover   
     />
       {/* Header Section */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">

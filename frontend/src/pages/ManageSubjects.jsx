@@ -5,6 +5,16 @@ import { FaEdit, FaTrash, FaPlus, FaTimes, FaBook, FaGraduationCap, FaSpinner, F
 import { useUserRole } from "../context/UserRoleContext";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+const toastCustomStyles = `
+  @media (max-width: 480px) {
+    .Toastify__toast {
+      margin: 20px ;
+      width: calc(100% - 40px);
+      padding: 14px ;
+      border-radius: 8px; 
+    }
+  }
+`;
 
 const ManageSubjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -266,6 +276,7 @@ const handleEdit = (id) => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Toast Container */}
+            <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
             <ToastContainer 
                 position="top-right"
                 autoClose={3000}
