@@ -12,6 +12,18 @@ import {
   FaBook,
 } from "react-icons/fa";
 import { useUserRole } from "../context/UserRoleContext";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+const toastCustomStyles = `
+  @media (max-width: 480px) {
+    .Toastify__toast {
+      margin: 20px ;
+      width: calc(100% - 40px);
+      padding: 14px ;
+      border-radius: 8px; 
+    }
+  }
+`;
 
 const ManageBatches = () => {
   const [batches, setBatches] = useState([]);
@@ -124,14 +136,14 @@ const ManageBatches = () => {
       !newBatch.section.trim() ||
       !newBatch.course_id
     ) {
-      alert("Please fill in all required fields");
+      toast.error("Please fill in all required fields");
       return;
     }
 
     // Validate year is a valid number
     const yearNumber = parseInt(newBatch.year.trim());
     if (isNaN(yearNumber)) {
-      alert("Please enter a valid year (numbers only)");
+      toast.error("Please enter a valid year (numbers only)");
       return;
     }
 
@@ -165,21 +177,50 @@ const ManageBatches = () => {
       await fetchBatches();
       setNewBatch({ year: "", section: "", course_id: "" });
       setShowAddDialog(false);
+      toast.success(`Batch ${newBatch.id ? 'updated' : 'added'} successfully!`);
+
     } catch (err) {
       console.error("Full error:", err);
       let errorMessage = err.message;
-      alert(
+      toast.error(
         `Failed to ${newBatch.id ? "update" : "add"} batch: ${errorMessage}`
       );
     } finally {
       setAddingBatch(false);
     }
   };
-
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this batch?")) {
-      return;
-    }
+    toast.info(
+      <div>
+        <div className="mb-2">Are you sure you want to delete this batch?</div>
+        <div className="flex justify-end space-x-2 mt-2">
+          <button 
+            onClick={() => {
+              toast.dismiss();
+              performDelete(id);
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
+          <button 
+            onClick={() => toast.dismiss()} 
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      {
+        autoClose: false,
+        closeButton: false,
+        position:  'top-right',
+        // className: 'mt-4 my-2 sm:mt-2 mx-2', // Responsive margins
+      }
+    );
+  };
+
+  const performDelete = async (id) => {
 
     try {
       const response = await fetch(API_ENDPOINTS.DELETE_BATCH(id), {
@@ -197,9 +238,10 @@ const ManageBatches = () => {
 
       setBatches(batches.filter((batch) => batch.id !== id));
       setFilteredBatches(filteredBatches.filter((batch) => batch.id !== id));
+       toast.success('Batch deleted successfully!');
     } catch (err) {
       console.error("Error deleting batch:", err);
-      alert(`Failed to delete batch: ${err.message}`);
+      toast.error(`Failed to delete batch: ${err.message}`);
     }
   };
 
@@ -264,6 +306,17 @@ const ManageBatches = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+       <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover   
+    />
       {/* Header Section */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

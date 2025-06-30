@@ -3,6 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import Heading from "../components/Heading";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaUserTie, FaSpinner, FaSearch } from "react-icons/fa";
 import { useUserRole } from "../context/UserRoleContext";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+const toastCustomStyles = `
+  @media (max-width: 480px) {
+    .Toastify__toast {
+      margin: 20px ;
+      width: calc(100% - 40px);
+      padding: 14px ;
+      border-radius: 8px; 
+    }
+  }
+`;
 
 const ManageFaculty = () => {
     const [faculties, setFaculties] = useState([]);
@@ -70,7 +82,7 @@ const ManageFaculty = () => {
 
     const handleSaveFaculty = async () => {
         if (!newFaculty.Name.trim()) {
-            alert('Please enter a faculty name');
+            toast.error('Please enter a faculty name');
             return;
         }
 
@@ -108,10 +120,11 @@ const ManageFaculty = () => {
             await fetchFaculties();
             resetForm();
             setShowAddDialog(false);
+            toast.success(`Faculty ${editingFaculty ? 'updated' : 'added'} successfully!`);
 
         } catch (err) {
             console.error(`Error ${editingFaculty ? 'updating' : 'adding'} faculty:`, err);
-            alert(`Failed to ${editingFaculty ? 'update' : 'add'} faculty: ${err.message}`);
+            toast.error(`Failed to ${editingFaculty ? 'update' : 'add'} faculty: ${err.message}`);
         } finally {
             setAddingFaculty(false);
             setEditingFaculty(false);
@@ -119,9 +132,35 @@ const ManageFaculty = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this faculty? This action cannot be undone.")) {
-            return;
-        }
+        toast.info(
+            <div>
+                <div className="mb-2">Are you sure you want to delete this faculty member?</div>
+                <div className="flex justify-end space-x-2 mt-2">
+                    <button 
+                        onClick={() => {
+                            toast.dismiss();
+                            performDelete(id);
+                        }}
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                        Delete
+                    </button>
+                    <button 
+                        onClick={() => toast.dismiss()} 
+                        className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>,
+            {
+                autoClose: false,
+                closeButton: false,
+                position: 'top-center',
+            }
+        );
+    }
+    const performDelete = async (id) => {
 
         try {
             const response = await fetch(API_ENDPOINTS.DELETE_FACULTY(id), {
@@ -138,10 +177,10 @@ const ManageFaculty = () => {
 
             setFaculties(faculties.filter(faculty => faculty.ID !== id));
             setFilteredFaculties(filteredFaculties.filter(faculty => faculty.ID !== id));
-
+            toast.success("Faculty Deleted Successfully");
         } catch (err) {
             console.error('Error deleting faculty:', err);
-            alert(`Failed to delete faculty: ${err.message}`);
+            toast.error(`Failed to delete faculty: ${err.message}`);
         }
     };
 
@@ -205,6 +244,18 @@ const ManageFaculty = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+             <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
+             <ToastContainer 
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+            />
             {/* Header Section */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

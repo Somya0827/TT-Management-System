@@ -3,6 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import Heading from "../components/Heading";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaBook, FaGraduationCap, FaSpinner, FaSearch } from "react-icons/fa";
 import { useUserRole } from "../context/UserRoleContext";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+const toastCustomStyles = `
+  @media (max-width: 480px) {
+    .Toastify__toast {
+      margin: 20px ;
+      width: calc(100% - 40px);
+      padding: 14px ;
+      border-radius: 8px; 
+    }
+  }
+`;
 
 const ManageSubjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -102,7 +114,7 @@ const ManageSubjects = () => {
 
 const handleSaveNewSubject = async () => {
     if (!newSubject.name.trim() || !newSubject.code.trim() || !newSubject.course_id) {
-        alert('Please fill in all required fields');
+        toast.error('Please fill in all required fields');
         return;
     }
 
@@ -137,19 +149,47 @@ const handleSaveNewSubject = async () => {
         await fetchSubjects();
         setNewSubject({ name: "", code: "", course_code: "", course_id: "" });
         setShowAddDialog(false);
+        toast.success(`Subject ${newSubject.id ? 'updated' : 'added'} successfully!`);
 
     } catch (err) {
         console.error('Full error:', err);
         let errorMessage = err.message;
-        alert(`Failed to ${newSubject.id ? 'update' : 'add'} subject: ${errorMessage}`);
+        toast.error(`Failed to ${newSubject.id ? 'update' : 'add'} subject: ${errorMessage}`);
     } finally {
         setAddingSubject(false);
     }
 };
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this subject?")) {
-            return;
-        }
+
+ const handleDelete = async (id) => {
+        toast.info(
+            <div>
+                <div className="mb-2">Are you sure you want to delete this subject?</div>
+                <div className="flex justify-end space-x-2 mt-2">
+                    <button 
+                        onClick={() => {
+                            toast.dismiss();
+                            performDelete(id);
+                        }}
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                        Delete
+                    </button>
+                    <button 
+                        onClick={() => toast.dismiss()} 
+                        className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>,
+            {
+                autoClose: false,
+                closeButton: false,
+                position: 'top-center',
+            }
+        );
+    };
+    const performDelete = async (id) => {
 
         try {
             const response = await fetch(API_ENDPOINTS.DELETE_SUBJECT(id), {
@@ -166,10 +206,11 @@ const handleSaveNewSubject = async () => {
 
             setSubjects(subjects.filter(subject => subject.id !== id));
             setFilteredSubjects(filteredSubjects.filter(subject => subject.id !== id));
+            toast.success('Subject deleted successfully!');
 
         } catch (err) {
             console.error('Error deleting subject:', err);
-            alert(`Failed to delete subject: ${err.message}`);
+            toast.error(`Failed to delete subject: ${err.message}`);
         }
     };
 
@@ -234,6 +275,18 @@ const handleEdit = (id) => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            {/* Toast Container */}
+            <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
+            <ToastContainer 
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+            />
             {/* Header Section */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
