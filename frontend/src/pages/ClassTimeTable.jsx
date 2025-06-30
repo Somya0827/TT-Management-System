@@ -12,18 +12,19 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCcw } from "lucide-react";
 import clsx from 'clsx';
 
-
 const ClassTimeTable = () => {
   // State for fetched data from APIs (courses, batches, etc.)
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
   const [semesters, setSemesters] = useState([]);
-  const [subjects, setSubjects] = useState([]); // Keep subjects to display names in timetable
+  const [subjects, setSubjects] = useState([]);
   const [faculties, setFaculties] = useState([]);
   const [rooms, setRooms] = useState([]);
 
   // State for the currently displayed lectures (timetable data)
   const [lectures, setLectures] = useState([]);
+  const [gridData, setGridData] = useState({});
+  const [allTimeSlots, setAllTimeSlots] = useState([]);
 
   // State for the selected filter criteria by the user
   const [selectedFilters, setSelectedFilters] = useState({
@@ -35,9 +36,9 @@ const ClassTimeTable = () => {
   });
 
   // State for loading and error handling
-  const [loading, setLoading] = useState(false); // For initial data loading
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isLoadingLectures, setIsLoadingLectures] = useState(false); // For lecture data loading
+  const [isLoadingLectures, setIsLoadingLectures] = useState(false);
 
   const navigate = useNavigate();
 
@@ -54,13 +55,109 @@ const ClassTimeTable = () => {
     LECTURE_QUERY: `${API_BASE_URL}/lecture/query`,
   };
 
-  // Effect to fetch initial data (courses, batches, etc.) on component mount
+  // Effect to fetch initial data on component mount
   useEffect(() => {
     fetchAllData();
   }, []);
 
+  // Function to group consecutive time slots for the same lecture
+  const groupConsecutiveTimeSlots = (lectures, days, timeSlots) => {
+    const groupedData = {};
 
-  // --- Data Fetching Functions ---
+    days.forEach(day => {
+      let currentGroup = null;
+
+      timeSlots.forEach((time, timeIndex) => {
+        const [startTime, endTime] = time.split('-');
+        const lecture = lectures.find(lec =>
+          lec.DayOfWeek === day &&
+          lec.StartTime === startTime &&
+          lec.EndTime === endTime
+        );
+
+        if (lecture) {
+          const subjectName = subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A';
+          const facultyName = faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A';
+          const groupKey = `${day}-${subjectName}-${facultyName}`;
+
+          if (currentGroup && currentGroup.groupKey === groupKey &&
+              currentGroup.endIndex === timeIndex - 1) {
+            // Continue current group
+            currentGroup.timeSlots.push(time);
+            currentGroup.endIndex = timeIndex;
+            groupedData[`${day}-${time}`] = currentGroup;
+          } else {
+            // Start new group
+            currentGroup = {
+              ...lecture,
+              groupKey,
+              subject: subjectName,
+              faculty: facultyName,
+              code: subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A',
+              room: rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A',
+              timeSlots: [time],
+              startIndex: timeIndex,
+              endIndex: timeIndex,
+              isGrouped: true
+            };
+            groupedData[`${day}-${time}`] = currentGroup;
+          }
+        } else {
+          // No lecture, reset current group
+          currentGroup = null;
+        }
+      });
+    });
+
+    return groupedData;
+  };
+
+  // Convert lectures to grid data format and collect all unique time slots
+  const convertLecturesToGridData = (lectures) => {
+    const grid = {};
+    const uniqueTimeSlots = new Set(academicData.timeSlots);
+
+    lectures.forEach(lecture => {
+      const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
+      uniqueTimeSlots.add(timeSlot);
+
+      const key = `${lecture.DayOfWeek}-${timeSlot}`;
+      grid[key] = {
+        id: lecture.ID,
+        subject: subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A',
+        code: subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A',
+        faculty: faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A',
+        room: rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A',
+        startTime: lecture.StartTime,
+        endTime: lecture.EndTime
+      };
+    });
+
+    // Convert Set to array and sort time slots
+    const sortedTimeSlots = sortTimeSlots([...uniqueTimeSlots]);
+    setAllTimeSlots(sortedTimeSlots);
+
+    return grid;
+  };
+
+  // Parse time strings (HH:MM) into minutes for comparison
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Sorts time slots chronologically
+  const sortTimeSlots = (slots) => {
+    if (!Array.isArray(slots)) return [];
+    return slots.slice().sort((a, b) => {
+      const [startA] = a.split('-');
+      const [startB] = b.split('-');
+      return parseTimeToMinutes(startA) - parseTimeToMinutes(startB);
+    });
+  };
+
+  // Fetch all initial data
   const fetchAllData = async () => {
     setLoading(true);
     setError(null);
@@ -73,6 +170,7 @@ const ClassTimeTable = () => {
         fetchRooms()
       ]);
       setSemesters(Array.isArray(academicData.semesters) ? academicData.semesters : []);
+      setAllTimeSlots(Array.isArray(academicData.timeSlots) ? sortTimeSlots(academicData.timeSlots) : []);
     } catch (err) {
       setError('Failed to fetch initial data');
       console.error('Error fetching initial data:', err);
@@ -81,6 +179,7 @@ const ClassTimeTable = () => {
     }
   };
 
+  // Individual data fetching functions
   const fetchCourses = async () => {
     try {
       const response = await fetch(API_ENDPOINTS.GET_COURSE, {
@@ -122,11 +221,7 @@ const ClassTimeTable = () => {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       setSubjects(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -135,7 +230,6 @@ const ClassTimeTable = () => {
       setSubjects([]);
     }
   };
-
 
   const fetchFaculties = async () => {
     try {
@@ -171,12 +265,12 @@ const ClassTimeTable = () => {
     }
   };
 
-
-  // --- Function to Fetch Lectures based on the current selectedFilters state ---
+  // Fetch lectures based on filters
   const fetchLectures = async () => {
     setIsLoadingLectures(true);
     setError(null);
-    setLectures([]); // Clear previous lectures while loading
+    setLectures([]);
+    setGridData({});
 
     try {
       // Find the selected objects based on their names
@@ -186,7 +280,7 @@ const ClassTimeTable = () => {
       const selectedRoom = rooms.find(r => r.Name === selectedFilters.room);
       const semesterNumber = selectedFilters.semester !== undefined ? romanToInteger(selectedFilters.semester) : undefined;
 
-      // Build query parameters based on selected filters
+      // Build query parameters
       const queryParams = new URLSearchParams();
 
       if (selectedFaculty) {
@@ -201,7 +295,7 @@ const ClassTimeTable = () => {
         }
       }
 
-      // Fetch lectures with query parameters
+      // Fetch lectures
       const response = await fetch(`${API_ENDPOINTS.LECTURE_QUERY}?${queryParams}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -210,24 +304,27 @@ const ClassTimeTable = () => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          setLectures([]); // No lectures found is not an error in this view
+          setLectures([]);
         } else {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       } else {
         const filteredLectures = await response.json();
         setLectures(filteredLectures);
+
+        // Convert to grid data format and update time slots
+        const gridData = convertLecturesToGridData(filteredLectures);
+        setGridData(gridData);
       }
     } catch (err) {
       setError('Failed to fetch lectures');
       console.error('Error fetching lectures:', err);
-      setLectures([]); // Clear lectures on error
     } finally {
       setIsLoadingLectures(false);
     }
   };
 
-  // These handlers update the selectedFilters state
+  // Filter handlers
   const handleCourseChange = (value) => {
     setSelectedFilters({
       course: value === "placeholder" ? null : value,
@@ -238,48 +335,47 @@ const ClassTimeTable = () => {
     });
   };
 
-const handleBatchChange = (value) => {
-  setSelectedFilters(prev => ({
-    ...prev,
-    batch: value === "placeholder" ? null : value,
-    semester: null,
-    faculty: null,
-    room: null
-  }));
-};
+  const handleBatchChange = (value) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      batch: value === "placeholder" ? null : value,
+      semester: null,
+      faculty: null,
+      room: null
+    }));
+  };
 
-const handleSemesterChange = (value) => {
-  setSelectedFilters(prev => ({
-    ...prev,
-    semester: value === "placeholder" ? null : value,
-    faculty: null,
-    room: null
-  }));
-};
+  const handleSemesterChange = (value) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      semester: value === "placeholder" ? null : value,
+      faculty: null,
+      room: null
+    }));
+  };
 
-const handleFacultyChange = (value) => {
-  setSelectedFilters({
-    faculty: value === "placeholder" ? null : value,
-    course: null,
-    batch: null,
-    semester: null,
-    room: null
-  });
-};
+  const handleFacultyChange = (value) => {
+    setSelectedFilters({
+      faculty: value === "placeholder" ? null : value,
+      course: null,
+      batch: null,
+      semester: null,
+      room: null
+    });
+  };
 
-const handleRoomChange = (value) => {
-  setSelectedFilters({
-    room: value === "placeholder" ? null : value,
-    course: null,
-    batch: null,
-    semester: null,
-    faculty: null
-  });
-};
+  const handleRoomChange = (value) => {
+    setSelectedFilters({
+      room: value === "placeholder" ? null : value,
+      course: null,
+      batch: null,
+      semester: null,
+      faculty: null
+    });
+  };
 
-  // --- Button Handlers ---
+  // Button handlers
   const handleGenerateTimetable = () => {
-    // Allow fetching if faculty or room is selected OR if course+batch+semester are selected
     if (selectedFilters.faculty !== undefined ||
       selectedFilters.room !== undefined ||
       (selectedFilters.course !== undefined &&
@@ -300,46 +396,11 @@ const handleRoomChange = (value) => {
       room: null
     });
     setLectures([]);
+    setGridData({});
+    setAllTimeSlots(Array.isArray(academicData.timeSlots) ? sortTimeSlots(academicData.timeSlots) : []);
   };
 
-
-  // --- Filtering Options for Dropdowns ---
-  const getFilteredBatches = () => {
-    if (!selectedFilters.course) return [];
-    const selectedCourse = courses.find(course => course.Name === selectedFilters.course);
-    if (!selectedCourse) return [];
-
-    return batches
-      .filter(batch => batch.CourseID === selectedCourse.ID)
-      .sort((a, b) => {
-        if (a.Year !== b.Year) return a.Year - b.Year;
-        return a.Section.localeCompare(b.Section);
-      });
-  };
-
-  const getFilteredSemesters = () => {
-    // Filter semesters based on selected course and batch if necessary
-    // Assuming semesters are linked to batches or courses in academicData
-    if (selectedFilters.course === undefined || selectedFilters.batch === undefined) return semesters;
-    // Add logic to filter semesters based on selected course and batch if needed
-    return semesters; // Return all semesters for now if no specific filtering logic exists
-  };
-
-  const getFilteredFaculties = () => {
-    // Filter faculties based on selected course, batch, semester if necessary
-    // For now, return all faculties
-    return faculties;
-  };
-
-  const getFilteredRooms = () => {
-    // Filter rooms based on selected course, batch, semester if necessary
-    // For now, return all rooms
-    return rooms;
-  };
-
-
-  // --- Utility Functions ---
-  // Converts Roman numerals to integers (used for semester)
+  // Utility functions
   const romanToInteger = (roman) => {
     if (typeof roman === 'number' || !isNaN(roman)) {
       return parseInt(roman);
@@ -362,41 +423,19 @@ const handleRoomChange = (value) => {
         i++;
       } else if (current) {
         result += current;
-      } else {
-        console.warn(`Invalid Roman numeral character: ${romanStr[i]}`);
       }
     }
 
     return result;
   };
 
-  // Parses time strings (HH:MM) into minutes for comparison
-  const parseTimeToMinutes = (timeStr) => {
-      if (!timeStr) return 0;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-
-  // Sorts time slots chronologically
-  const sortTimeSlots = (slots) => {
-      if (!Array.isArray(slots)) return [];
-    return slots.slice().sort((a, b) => {
-      const [startA] = a.split('-');
-      const [startB] = b.split('-');
-      return parseTimeToMinutes(startA) - parseTimeToMinutes(startB);
-    });
-  };
-
-  // Get days of the week and time slots from academicData.json
+  // Get days from academicData
   const days = Array.isArray(academicData.days) ? academicData.days : [];
-  const timeSlots = Array.isArray(academicData.timeSlots) ? academicData.timeSlots : [];
 
-
-  // --- Render JSX ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header and Error Handling */}
-       {error && (
+      {/* Error Display */}
+      {error && (
         <div className="flex justify-center items-center py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-md mx-4">
             <div className="mb-4">
@@ -407,7 +446,7 @@ const handleRoomChange = (value) => {
               </div>
             </div>
             <p className="text-red-600 font-medium mb-4">{error}</p>
-             <Button
+            <Button
               onClick={fetchAllData}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
             >
@@ -417,14 +456,13 @@ const handleRoomChange = (value) => {
         </div>
       )}
 
-
       {/* Controls */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex justify-between items-center">
             <div>
-                <h1 className="text-xl font-bold text-white">View Timetable</h1>
-                <p className="text-indigo-100 text-sm mt-1">View academic schedules</p>
+              <h1 className="text-xl font-bold text-white">View Timetable</h1>
+              <p className="text-indigo-100 text-sm mt-1">View academic schedules</p>
             </div>
             <div>
               <Button
@@ -432,199 +470,208 @@ const handleRoomChange = (value) => {
                 onClick={() => navigate("/dashboard")}
               >
                 <span className="hidden sm:inline">Back to DashBoard</span>
-                <span className="sm:hidden ">Back</span>
+                <span className="sm:hidden">Back</span>
               </Button>
             </div>
           </div>
 
-<div className="p-6">
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-    {/* Course Select */}
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Course</label>
-      <Select
-        value={selectedFilters.course ?? ""}
-        onValueChange={handleCourseChange}
-      >
-        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-          <SelectValue placeholder="Select course" />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl border-2 shadow-lg">
-          <SelectItem value="placeholder">Select course</SelectItem>
-          {courses.map((course) => (
-            <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
-              <div className="flex flex-col">
-                <span className="font-medium">{course.Name}</span>
-                {course.Code && (
-                  <span className="text-xs text-gray-500">{course.Code}</span>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Course Select */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Course</label>
+                <Select
+                  value={selectedFilters.course ?? ""}
+                  onValueChange={handleCourseChange}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select course" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    <SelectItem value="placeholder">Select course</SelectItem>
+                    {courses.map((course) => (
+                      <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{course.Name}</span>
+                          {course.Code && (
+                            <span className="text-xs text-gray-500">{course.Code}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Batch Select */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Batch</label>
+                <Select
+                  disabled={!selectedFilters.course || loading}
+                  value={selectedFilters.batch ?? ""}
+                  onValueChange={handleBatchChange}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select batch" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    <SelectItem value="placeholder">Select batch</SelectItem>
+                    {batches
+                      .filter(batch => {
+                        const selectedCourse = courses.find(c => c.Name === selectedFilters.course);
+                        return selectedCourse ? batch.CourseID === selectedCourse.ID : false;
+                      })
+                      .sort((a, b) => {
+                        if (a.Year !== b.Year) return a.Year - b.Year;
+                        return a.Section.localeCompare(b.Section);
+                      })
+                      .map((batch) => (
+                        <SelectItem
+                          key={batch.ID}
+                          value={`${batch.Year}-${batch.Section}`}
+                          className="rounded-lg"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">Batch {batch.Year} - Section {batch.Section}</span>
+                            {batch.Course?.Name && (
+                              <span className="text-xs text-gray-500">{batch.Course.Name}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Semester Select */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Semester</label>
+                <Select
+                  value={selectedFilters.semester ?? ""}
+                  onValueChange={handleSemesterChange}
+                  disabled={!selectedFilters.batch}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select semester" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    <SelectItem value="placeholder">Select semester</SelectItem>
+                    {semesters.map((semester) => (
+                      <SelectItem
+                        key={semester.id}
+                        value={semester.id || semester.number?.toString()}
+                        className="rounded-lg"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{semester.id || semester.number}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Faculty Select */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Faculty</label>
+                <Select
+                  value={selectedFilters.faculty ?? ""}
+                  onValueChange={handleFacultyChange}
+                  disabled={loading}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select faculty" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    <SelectItem value="placeholder">Select faculty</SelectItem>
+                    {faculties.map((faculty) => (
+                      <SelectItem
+                        key={faculty.ID}
+                        value={faculty.Name}
+                        className="rounded-lg"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{faculty.Name}</span>
+                          {faculty.Email && (
+                            <span className="text-xs text-gray-500">{faculty.Email}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Room Select */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Room</label>
+                <Select
+                  value={selectedFilters.room ?? ""}
+                  onValueChange={handleRoomChange}
+                  disabled={loading}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select room" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    <SelectItem value="placeholder">Select room</SelectItem>
+                    {rooms.map((room) => (
+                      <SelectItem
+                        key={room.ID}
+                        value={room.Name}
+                        className="rounded-lg"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{room.Name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Generate Timetable and Reset Buttons */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <Button
+                className={clsx(
+                  "w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300",
+                  {
+                    "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white transform hover:scale-[1.02]":
+                      (selectedFilters.course && selectedFilters.batch && selectedFilters.semester) ||
+                      selectedFilters.faculty ||
+                      selectedFilters.room,
+                    "bg-gray-200 text-gray-500 cursor-not-allowed":
+                      !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
+                      !selectedFilters.faculty &&
+                      !selectedFilters.room
+                  }
                 )}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Batch Select */}
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Batch</label>
-      <Select
-        disabled={!selectedFilters.course || loading}
-        value={selectedFilters.batch ?? ""}
-        onValueChange={handleBatchChange}
-      >
-        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-          <SelectValue placeholder="Select batch" />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl border-2 shadow-lg">
-          <SelectItem value="placeholder">Select batch</SelectItem>
-          {getFilteredBatches().map((batch) => (
-            <SelectItem
-              key={batch.ID}
-              value={`${batch.Year}-${batch.Section}`}
-              className="rounded-lg"
-            >
-              <div className="flex flex-col">
-                <span className="font-medium">Batch {batch.Year} - Section {batch.Section}</span>
-                {batch.Course?.Name && (
-                  <span className="text-xs text-gray-500">{batch.Course.Name}</span>
-                )}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Semester Select */}
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Semester</label>
-      <Select
-        value={selectedFilters.semester ?? ""}
-        onValueChange={handleSemesterChange}
-        disabled={!selectedFilters.batch}
-      >
-        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-          <SelectValue placeholder="Select semester" />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl border-2 shadow-lg">
-          <SelectItem value="placeholder">Select semester</SelectItem>
-          {getFilteredSemesters().map((semester) => (
-            <SelectItem
-              key={semester.id}
-              value={semester.id || semester.number?.toString()}
-              className="rounded-lg"
-            >
-              <div className="flex flex-col">
-                <span className="font-medium">{semester.id || semester.number}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Faculty Select */}
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Faculty</label>
-      <Select
-        value={selectedFilters.faculty ?? ""}
-        onValueChange={handleFacultyChange}
-        disabled={loading}
-      >
-        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-          <SelectValue placeholder="Select faculty" />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl border-2 shadow-lg">
-          <SelectItem value="placeholder">Select faculty</SelectItem>
-          {getFilteredFaculties().map((faculty) => (
-            <SelectItem
-              key={faculty.ID}
-              value={faculty.Name}
-              className="rounded-lg"
-            >
-              <div className="flex flex-col">
-                <span className="font-medium">{faculty.Name}</span>
-                {faculty.Email && (
-                  <span className="text-xs text-gray-500">{faculty.Email}</span>
-                )}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Room Select */}
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Room</label>
-      <Select
-        value={selectedFilters.room ?? ""}
-        onValueChange={handleRoomChange}
-        disabled={loading}
-      >
-        <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-          <SelectValue placeholder="Select room" />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl border-2 shadow-lg">
-          <SelectItem value="placeholder">Select room</SelectItem>
-          {getFilteredRooms().map((room) => (
-            <SelectItem
-              key={room.ID}
-              value={room.Name}
-              className="rounded-lg"
-            >
-              <div className="flex flex-col">
-                <span className="font-medium">{room.Name}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-
-  {/* Generate Timetable and Reset Buttons */}
-  <div className="mt-8 flex flex-col sm:flex-row gap-4">
-    <Button
-      className={clsx(
-        "w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300",
-        {
-          "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white transform hover:scale-[1.02]":
-            (selectedFilters.course && selectedFilters.batch && selectedFilters.semester) ||
-            selectedFilters.faculty ||
-            selectedFilters.room,
-          "bg-gray-200 text-gray-500 cursor-not-allowed":
-            !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
-            !selectedFilters.faculty &&
-            !selectedFilters.room
-        }
-      )}
-      onClick={handleGenerateTimetable}
-      disabled={
-        !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
-        !selectedFilters.faculty &&
-        !selectedFilters.room
-      }
-    >
-      Generate Timetable
-    </Button>
-    <Button
-      className="w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300 bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center gap-2"
-      onClick={handleReset}
-      disabled={loading || isLoadingLectures}
-    >
-      <RefreshCcw size={18} />
-      Reset
-    </Button>
-  </div>
-</div>
+                onClick={handleGenerateTimetable}
+                disabled={
+                  !(selectedFilters.course && selectedFilters.batch && selectedFilters.semester) &&
+                  !selectedFilters.faculty &&
+                  !selectedFilters.room
+                }
+              >
+                Generate Timetable
+              </Button>
+              <Button
+                className="w-full sm:w-auto h-12 font-semibold rounded-xl shadow-lg transition-all duration-300 bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center gap-2"
+                onClick={handleReset}
+                disabled={loading || isLoadingLectures}
+              >
+                <RefreshCcw size={18} />
+                Reset
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Loading State for Lectures */}
+      {/* Loading State */}
       {(isLoadingLectures || loading) && (
-         <div className="flex justify-center items-center py-8">
+        <div className="flex justify-center items-center py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 flex items-center space-x-4">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
             <p className="text-gray-700 font-medium">
@@ -634,67 +681,76 @@ const handleRoomChange = (value) => {
         </div>
       )}
 
-
-      {/* Timetable Grid (View Only) */}
+      {/* Timetable Grid */}
       {lectures.length > 0 && !isLoadingLectures && (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 pb-8">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-             <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4">
-                 <h2 className="text-xl font-bold text-white">Timetable</h2>
-             </div>
+            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Timetable</h2>
+                  <p className="text-indigo-100 text-sm">View your class schedule</p>
+                </div>
+              </div>
+            </div>
 
             {/* Mobile Timetable View */}
             <div className="lg:hidden">
               <div className="p-4 space-y-4">
-                {days.map((day) => (
-                  <div key={day} className="bg-gray-50 rounded-xl p-4">
-                    <h3 className="font-bold text-indigo-700 mb-3 text-lg">{day}</h3>
-                    <div className="space-y-2">
-                      {sortTimeSlots([...timeSlots]).map((time) => {
-                        const lecture = lectures.find(lec =>
-                          lec.DayOfWeek === day &&
-                          `${lec.StartTime}-${lec.EndTime}` === time
-                        );
-                        return (
-                          <div
-                            key={`${day}-${time}`}
-                            className="bg-white rounded-lg p-3 border-2 border-gray-200"
-                          >
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-sm font-semibold text-gray-600 mb-1">{time}</div>
-                                {lecture ? (
+                {days.map((day) => {
+                  // Get all lectures for this day
+                  const dayLectures = lectures.filter(lec => lec.DayOfWeek === day);
+
+                  return (
+                    <div key={day} className="bg-gray-50 rounded-xl p-4">
+                      <h3 className="font-bold text-indigo-700 mb-3 text-lg">{day}</h3>
+                      <div className="space-y-2">
+                        {/* Show all lectures for this day, not just predefined time slots */}
+                        {dayLectures.map((lecture) => {
+                          const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
+                          const subjectName = subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A';
+                          const facultyName = faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A';
+                          const roomName = rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A';
+                          const subjectCode = subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A';
+
+                          return (
+                            <div
+                              key={`${day}-${lecture.ID}`}
+                              className="bg-white rounded-lg p-3 border-2 border-gray-200"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="text-sm font-semibold text-gray-600 mb-1">
+                                    {timeSlot}
+                                  </div>
                                   <div>
                                     <div className="font-semibold text-indigo-700 text-sm mb-1">
-                                      {subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A'}
+                                      {subjectName}
                                     </div>
                                     <div className="text-xs text-gray-600 mb-1">
-                                        {subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A'}
+                                      {subjectCode}
                                     </div>
-                                     <div className="text-xs text-gray-500">
-                                      {faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A'}
+                                    <div className="text-xs text-gray-500">
+                                      {facultyName}
                                     </div>
-                                     <div className="text-xs text-gray-500">
-                                        {rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A'}
+                                    <div className="text-xs text-gray-500">
+                                      {roomName}
                                     </div>
                                   </div>
-                                ) : (
-                                  <div className="text-gray-400 text-sm">No class</div>
-                                )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-
             {/* Desktop Timetable Table */}
-             <div className="hidden lg:block p-6">
+            <div className="hidden lg:block p-6">
               <div className="overflow-x-auto rounded-xl border-2 border-gray-200">
                 <table className="w-full border-collapse">
                   <thead>
@@ -702,57 +758,82 @@ const handleRoomChange = (value) => {
                       <th className="border-r border-gray-200 p-4 text-center font-bold text-indigo-700 bg-white">
                         Day / Time
                       </th>
-                      {sortTimeSlots([...timeSlots]).map((time, index) => (
+                      {allTimeSlots.map((time, index) => (
                         <th
                           key={index}
                           className="border-r border-gray-200 p-3 text-center font-semibold text-indigo-700 relative min-w-[140px]"
                         >
-                           <span className="text-sm font-medium">{time}</span>
+                          <span className="text-sm font-medium">{time}</span>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map((day, dayIndex) => (
-                      <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
-                          {day}
-                        </td>
-                        {sortTimeSlots([...timeSlots]).map((time) => {
-                           const lecture = lectures.find(lec =>
-                            lec.DayOfWeek === day &&
-                            `${lec.StartTime}-${lec.EndTime}` === time
-                          );
-                          return (
-                            <td
-                              key={`${day}-${time}`}
-                              className="border-r border-gray-200 p-3 text-center h-24 min-w-[140px]"
-                            >
-                              {lecture ? (
-                                <div className="space-y-1">
-                                   <div className="font-semibold text-indigo-700 text-sm leading-tight">
-                                      {subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A'}
+                    {days.map((day, dayIndex) => {
+                      const groupedLectures = groupConsecutiveTimeSlots(lectures, [day], allTimeSlots);
+
+                      // Also get all lectures for this day that might not be in predefined slots
+                      const allDayLectures = lectures.filter(lec => lec.DayOfWeek === day);
+
+                      return (
+                        <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
+                            {day}
+                          </td>
+                          {allTimeSlots.map((time, timeIndex) => {
+                            const cellKey = `${day}-${time}`;
+                            const groupedLecture = groupedLectures[cellKey];
+
+                            // Skip rendering if this is part of a group but not the first in the group
+                            if (groupedLecture?.isGrouped && groupedLecture.timeSlots[0] !== time) {
+                              return null;
+                            }
+
+                            // Calculate colSpan for grouped lectures
+                            const colSpan = groupedLecture?.isGrouped
+                              ? groupedLecture.timeSlots.length
+                              : 1;
+
+                            return (
+                              <td
+                                key={cellKey}
+                                className={clsx(
+                                  "border-r border-gray-200 p-3 text-center h-24 min-w-[140px]",
+                                  groupedLecture?.isGrouped ? "bg-blue-50" : ""
+                                )}
+                                colSpan={colSpan}
+                              >
+                                {groupedLecture ? (
+                                  <div className="space-y-1">
+                                    <div className="font-semibold text-indigo-700 text-sm leading-tight">
+                                      {groupedLecture.subject}
                                     </div>
                                     <div className="text-xs text-gray-600 font-medium">
-                                        {subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A'}
+                                      {groupedLecture.code}
                                     </div>
-                                     <div className="text-xs text-gray-500">
-                                      {faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A'}
+                                    <div className="text-xs text-gray-500">
+                                      {groupedLecture.faculty}
                                     </div>
-                                     <div className="text-xs text-gray-500">
-                                        {rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A'}
+                                    <div className="text-xs text-gray-500">
+                                      {groupedLecture.room}
                                     </div>
-                                </div>
-                              ) : (
-                                <div className="text-gray-400 text-sm font-medium">
-                                  No class
-                                </div>
-                              )}
-                            </td>
-                        );
-                        })}
-                      </tr>
-                    ))}
+                                    {colSpan > 1 && (
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-gray-400 text-sm font-medium">
+                                    No class
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -761,7 +842,7 @@ const handleRoomChange = (value) => {
         </div>
       )}
 
-      {/* Display message based on selection state */}
+      {/* Empty State */}
       {!isLoadingLectures && lectures.length === 0 && (
         <div className="flex justify-center items-center py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-md mx-4">
@@ -773,7 +854,6 @@ const handleRoomChange = (value) => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

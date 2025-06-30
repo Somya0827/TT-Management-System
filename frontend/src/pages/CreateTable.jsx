@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNavigate } from 'react-router-dom';
 import {
   Select,
   SelectTrigger,
@@ -20,6 +19,47 @@ import {
 import { Plus, Edit, Trash2, Save, RefreshCw, Trash } from "lucide-react";
 import academicData from "../assets/academicData.json";
 
+const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
+  const groupedData = {};
+
+  days.forEach(day => {
+    let currentGroup = null;
+
+    timeSlots.forEach((time, timeIndex) => {
+      const key = `${day}-${time}`;
+      const lecture = gridData[key];
+
+      if (lecture) {
+        const groupKey = `${day}-${lecture.subject}-${lecture.faculty}`;
+
+        if (currentGroup && currentGroup.groupKey === groupKey &&
+          currentGroup.endIndex === timeIndex - 1) {
+          // Continue current group
+          currentGroup.timeSlots.push(time);
+          currentGroup.endIndex = timeIndex;
+          groupedData[key] = currentGroup;
+        } else {
+          // Start new group
+          currentGroup = {
+            ...lecture,
+            groupKey,
+            timeSlots: [time],
+            startIndex: timeIndex,
+            endIndex: timeIndex,
+            isGrouped: true
+          };
+          groupedData[key] = currentGroup;
+        }
+      } else {
+        // No lecture, reset current group
+        currentGroup = null;
+      }
+    });
+  });
+
+  return groupedData;
+};
+
 const CreateTable = () => {
   const [gridData, setGridData] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
@@ -30,9 +70,20 @@ const CreateTable = () => {
     batch: "",
     semester: "",
   });
-  const navigate = useNavigate();
   const [isLocked, setIsLocked] = useState(false);
-  const [timeSlots, setTimeSlots] = useState([...academicData.timeSlots]);
+  const [predefinedTimeSlots] = useState([
+    "09:00-10:00",
+    "10:00-11:00",
+    "11:00-12:00",
+    "12:00-13:00",
+    "13:00-14:00",
+    "14:00-15:00",
+    "15:00-16:00",
+    "16:00-17:00"
+  ]);
+
+  // Initialize timeSlots with predefinedTimeSlots
+  const [timeSlots, setTimeSlots] = useState([...predefinedTimeSlots]);
   const [showAddTimeSlotDialog, setShowAddTimeSlotDialog] = useState(false);
   const [newTimeSlot, setNewTimeSlot] = useState("");
   const [editTimeSlotDialog, setEditTimeSlotDialog] = useState(false);
@@ -75,7 +126,7 @@ const CreateTable = () => {
     fetchAllData();
   }, []);
 
-    // Adding a function to debug the current state
+  // Adding a function to debug the current state
   const debugCurrentState = () => {
     console.log('Current State Debug:', {
       batchDetails,
@@ -330,228 +381,248 @@ const CreateTable = () => {
     });
   };
 
-const saveLectures = async () => {
-  if (!allDetailsSelected()) {
-    alert('Please select course, batch, and semester');
-    return;
-  }
-
-  setIsSaving(true);
-  try {
-    const [year, section] = batchDetails.batch.split('-');
-    const selectedBatch = batches.find(batch =>
-      batch.Year === parseInt(year) && batch.Section === section
-    );
-    const selectedCourse = courses.find(course => course.Name === batchDetails.course);
-
-    if (!selectedBatch || !selectedCourse) {
-      throw new Error('Selected batch or course not found');
+  const saveLectures = async () => {
+    if (!allDetailsSelected()) {
+      alert('Please select course, batch, and semester');
+      return;
     }
 
-    const semesterNumber = romanToInteger(batchDetails.semester);
+    setIsSaving(true);
+    try {
+      const [year, section] = batchDetails.batch.split('-');
+      const selectedBatch = batches.find(batch =>
+        batch.Year === parseInt(year) && batch.Section === section
+      );
+      const selectedCourse = courses.find(course => course.Name === batchDetails.course);
 
-    // Get all existing lectures for this batch and semester
-    const queryParams = new URLSearchParams();
-    queryParams.append('batch_id', selectedBatch.ID);
-    queryParams.append('semester', semesterNumber);
-    queryParams.append('section', selectedBatch.Section);
+      if (!selectedBatch || !selectedCourse) {
+        throw new Error('Selected batch or course not found');
+      }
 
-    const getResponse = await fetch(`${API_ENDPOINTS.LECTURE_QUERY}?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include'
-    });
+      const semesterNumber = romanToInteger(batchDetails.semester);
 
-    if (!getResponse.ok) {
-      throw new Error(`Failed to fetch existing lectures: ${getResponse.status}`);
-    }
+      // Get all existing lectures for this batch and semester
+      const queryParams = new URLSearchParams();
+      queryParams.append('batch_id', selectedBatch.ID);
+      queryParams.append('semester', semesterNumber);
+      queryParams.append('section', selectedBatch.Section);
 
-    const existingLectures = await getResponse.json();
+      const getResponse = await fetch(`${API_ENDPOINTS.LECTURE_QUERY}?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
 
-    // Create a map of existing lectures by their composite key
-    const existingLecturesMap = new Map();
-    existingLectures.forEach(lecture => {
-      const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
-      existingLecturesMap.set(key, lecture);
-    });
+      if (!getResponse.ok) {
+        throw new Error(`Failed to fetch existing lectures: ${getResponse.status}`);
+      }
 
-    // Process current grid data
-    const lecturesToProcess = Object.entries(timetableState.gridData)
-      .map(([key, entry]) => {
-        const [day, startTime, endTime] = key.split('-');
-        console.log(key);
-        console.log("Starttime:",startTime,"endtime:", endTime);
+      const existingLectures = await getResponse.json();
 
-        const subject = subjects.find(sub => sub.Name === entry.subject);
-        const faculty = faculties.find(fac => fac.Name === entry.faculty);
-        const room = rooms.find(r => r.Name === entry.room);
+      // Create a map of existing lectures by their composite key
+      const existingLecturesMap = new Map();
+      existingLectures.forEach(lecture => {
+        const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
+        existingLecturesMap.set(key, lecture);
+      });
 
-        if (!subject || !faculty) {
-          return null;
-        }
+      // Process current grid data
+      const lecturesToProcess = Object.entries(timetableState.gridData)
+        .map(([key, entry]) => {
+          const [day, startTime, endTime] = key.split('-');
+          const subject = subjects.find(sub => sub.Name === entry.subject);
+          const faculty = faculties.find(fac => fac.Name === entry.faculty);
+          const room = rooms.find(r => r.Name === entry.room);
 
-        return {
-          key,
-          data: {
-            DayOfWeek: day,
-            StartTime: startTime,
-            EndTime: endTime,
-            SubjectID: subject.ID,
-            FacultyID: faculty.ID,
-            BatchID: selectedBatch.ID,
-            Semester: semesterNumber,
-            RoomID: room?.ID || 1,
-            ID: entry.id // This will be undefined for new lectures
+          if (!subject || !faculty) return null;
+
+          return {
+            key,
+            data: {
+              ID: entry.id, // Always use existing ID if available
+              DayOfWeek: day,
+              StartTime: startTime,
+              EndTime: endTime,
+              SubjectID: subject.ID,
+              FacultyID: faculty.ID,
+              BatchID: selectedBatch.ID,
+              Semester: semesterNumber,
+              RoomID: room?.ID || 1
+            }
+          };
+        })
+        .filter(lecture => lecture !== null);
+
+      // Separate into creates and updates
+      const lecturesToUpdate = [];
+      const lecturesToCreate = [];
+
+      lecturesToProcess.forEach(({ key, data }) => {
+        const existingLecture = existingLecturesMap.get(key);
+
+        if (existingLecture) {
+          // Check if any fields have changed (including times)
+          const hasChanges = (
+            existingLecture.SubjectID !== data.SubjectID ||
+            existingLecture.FacultyID !== data.FacultyID ||
+            existingLecture.RoomID !== data.RoomID ||
+            existingLecture.StartTime !== data.StartTime ||
+            existingLecture.EndTime !== data.EndTime
+          );
+
+          if (hasChanges) {
+            lecturesToUpdate.push({
+              ...data,
+              ID: existingLecture.ID // Ensure we use the existing ID
+            });
           }
-        };
-      })
-      .filter(lecture => lecture !== null);
-
-    // Separate into creates and updates
-    const lecturesToCreate = [];
-    const lecturesToUpdate = [];
-    const lecturesToDelete = [];
-
-    lecturesToProcess.forEach(({ key, data }) => {
-      const existingLecture = existingLecturesMap.get(key);
-
-      if (existingLecture) {
-        // Check if any fields have changed
-        const hasChanges = (
-          existingLecture.SubjectID !== data.SubjectID ||
-          existingLecture.FacultyID !== data.FacultyID ||
-          existingLecture.RoomID !== data.RoomID
-        );
-
-        if (hasChanges) {
-          lecturesToUpdate.push({
-            ...data,
-            ID: existingLecture.ID // Ensure we use the existing ID
-          });
+        } else if (data.ID) {
+          // This is an existing lecture that had its timeslot changed
+          lecturesToUpdate.push(data);
+        } else {
+          // New lecture
+          lecturesToCreate.push(data);
         }
-      } else {
-        // New lecture
-        lecturesToCreate.push(data);
-      }
-    });
+      });
 
-    // Find lectures to delete (exist in DB but not in current grid)
-    const currentKeys = new Set(lecturesToProcess.map(l => l.key));
-    existingLectures.forEach(lecture => {
-      const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
-      if (!currentKeys.has(key)) {
-        lecturesToDelete.push(lecture);
-      }
-    });
+      // Find lectures to delete (exist in DB but not in current grid)
+      const currentKeys = new Set(lecturesToProcess.map(l => l.key));
+      const lecturesToDelete = existingLectures.filter(lecture => {
+        const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
 
-    console.log('Lectures to create:', lecturesToCreate.length);
-    console.log('Lectures to update:', lecturesToUpdate.length);
-    console.log('Lectures to delete:', lecturesToDelete.length);
+        // Don't delete if this lecture was updated (has matching ID in updates)
+        const wasUpdated = lecturesToUpdate.some(update => update.ID === lecture.ID);
 
-    // Execute updates
-    if (lecturesToUpdate.length > 0) {
-      const updatePromises = lecturesToUpdate.map(lecture =>
-        fetch(`${API_ENDPOINTS.LECTURE}/${lecture.ID}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(lecture)
-        })
-      );
+        return !currentKeys.has(key) && !wasUpdated;
+      });
 
-      const updateResponses = await Promise.all(updatePromises);
-      const updateFailed = updateResponses.some(res => !res.ok);
+      console.log('Lectures to create:', lecturesToCreate.length);
+      console.log('Lectures to update:', lecturesToUpdate.length);
+      console.log('Lectures to delete:', lecturesToDelete.length);
 
-      if (updateFailed) {
-        const errors = await Promise.all(
-          updateResponses.map(async (res, index) => {
-            if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}));
-              return `Update ${index + 1}: ${errorData.message || res.statusText || 'Unknown error'}`;
-            }
-            return null;
+      // Execute updates first
+      if (lecturesToUpdate.length > 0) {
+        const updatePromises = lecturesToUpdate.map(lecture =>
+          fetch(`${API_ENDPOINTS.LECTURE}/${lecture.ID}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(lecture)
           })
         );
-        throw new Error(`Some updates failed:\n${errors.filter(e => e).join('\n')}`);
+
+        const updateResponses = await Promise.all(updatePromises);
+        const updateFailed = updateResponses.some(res => !res.ok);
+
+        if (updateFailed) {
+          const errors = await Promise.all(
+            updateResponses.map(async (res, index) => {
+              if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                return {
+                  status: res.status,
+                  message: error.message || res.statusText,
+                  lectureData: lecturesToUpdate[index]
+                };
+              }
+              return null;
+            })
+          );
+          const errorMessages = errors.filter(e => e)
+            .map(e => `Lecture ${e.lectureData.ID}: ${e.message}`)
+            .join('\n');
+          throw new Error(`Some updates failed:\n${errorMessages}`);
+        }
       }
-    }
 
-    // Execute creates
-    if (lecturesToCreate.length > 0) {
-      const createPromises = lecturesToCreate.map(lecture =>
-        fetch(API_ENDPOINTS.LECTURE, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(lecture)
-        })
-      );
-
-      const createResponses = await Promise.all(createPromises);
-      const createFailed = createResponses.some(res => !res.ok);
-
-      if (createFailed) {
-        const errors = await Promise.all(
-          createResponses.map(async (res, index) => {
-            if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}));
-              return `Create ${index + 1}: ${errorData.message || res.statusText || 'Unknown error'}`;
-            }
-            return null;
+      // Execute creates only if there are truly new lectures
+      if (lecturesToCreate.length > 0) {
+        const createResponses = await Promise.all(lecturesToCreate.map(lecture =>
+          fetch(API_ENDPOINTS.LECTURE, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(lecture)
           })
-        );
-        throw new Error(`Some creates failed:\n${errors.filter(e => e).join('\n')}`);
+        ));
+
+        const createErrors = await Promise.all(createResponses.map(async (res, index) => {
+          if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return {
+              status: res.status,
+              message: error.message || res.statusText,
+              lectureData: lecturesToCreate[index]
+            };
+          }
+          return null;
+        }));
+
+        if (createErrors.some(e => e)) {
+          const errorMessages = createErrors.filter(e => e)
+            .map(e => `Lecture ${JSON.stringify(e.lectureData)}: ${e.message}`)
+            .join('\n');
+          throw new Error(`Some creates failed:\n${errorMessages}`);
+        }
       }
-    }
 
-    // Execute deletes
-    if (lecturesToDelete.length > 0) {
-      const deletePromises = lecturesToDelete.map(lecture =>
-        fetch(`${API_ENDPOINTS.LECTURE}/${lecture.ID}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        })
-      );
+      // Execute deletes last (only for lectures that weren't updated)
+      if (lecturesToDelete.length > 0) {
+        const deleteResponses = await Promise.all(lecturesToDelete.map(lecture =>
+          fetch(`${API_ENDPOINTS.LECTURE}/${lecture.ID}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include'
+          })
+        ));
 
-      const deleteResponses = await Promise.all(deletePromises);
-      const deleteFailed = deleteResponses.some(res => !res.ok);
+        const deleteErrors = await Promise.all(deleteResponses.map(async (res, index) => {
+          if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return {
+              status: res.status,
+              message: error.message || res.statusText,
+              lectureData: lecturesToDelete[index]
+            };
+          }
+          return null;
+        }));
 
-      if (deleteFailed) {
-        console.warn('Some deletes failed, but continuing...');
+        if (deleteErrors.some(e => e)) {
+          console.warn('Some deletes failed:', deleteErrors.filter(e => e));
+        }
       }
+
+      // Reload the timetable to get the latest data with IDs
+      await loadExistingLectures();
+
+      // Show success message
+      const messageParts = [];
+      if (lecturesToCreate.length) messageParts.push(`${lecturesToCreate.length} created`);
+      if (lecturesToUpdate.length) messageParts.push(`${lecturesToUpdate.length} updated`);
+      if (lecturesToDelete.length) messageParts.push(`${lecturesToDelete.length} deleted`);
+
+      const message = messageParts.length
+        ? `Timetable saved successfully! (${messageParts.join(', ')})`
+        : 'No changes detected';
+
+      alert(message);
+
+    } catch (error) {
+      console.error('Error saving lectures:', error);
+      alert(`Failed to save timetable: ${error.message}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    // Reload the timetable to get the latest data with IDs
-    await loadExistingLectures();
-
-    // Show success message
-    const messageParts = [];
-    if (lecturesToCreate.length) messageParts.push(`${lecturesToCreate.length} created`);
-    if (lecturesToUpdate.length) messageParts.push(`${lecturesToUpdate.length} updated`);
-    if (lecturesToDelete.length) messageParts.push(`${lecturesToDelete.length} deleted`);
-
-    const message = messageParts.length
-      ? `Timetable saved successfully! (${messageParts.join(', ')})`
-      : 'No changes detected';
-
-    alert(message);
-
-  } catch (error) {
-    console.error('Error saving lectures:', error);
-    alert(`Failed to save timetable: ${error.message}`);
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   const getFilteredBatches = () => {
     if (!batchDetails.course) return batches;
@@ -823,27 +894,61 @@ const saveLectures = async () => {
       return;
     }
 
-    const overlapCheck = checkTimeSlotOverlap(formattedTimeSlot, timeSlots, editingTimeSlot.index);
-    if (overlapCheck.hasOverlap) {
-      alert(overlapCheck.message);
+    const [newStart, newEnd] = formattedTimeSlot.split('-');
+    const newStartMin = parseTimeToMinutes(newStart);
+    const newEndMin = parseTimeToMinutes(newEnd);
+
+    if (newEndMin <= newStartMin) {
+      alert("End time must be after start time!");
       return;
     }
 
     const oldTimeSlot = timeSlots[editingTimeSlot.index];
-    const newTimeSlots = [...timeSlots];
+
+    // Create new time slots array
+    let newTimeSlots = [...timeSlots];
+
+    // Update the edited slot
     newTimeSlots[editingTimeSlot.index] = formattedTimeSlot;
 
-    // Update grid data keys to use the new time slot
-    const newGridData = {};
-    Object.keys(gridData).forEach(key => {
-      const [day, time] = key.split('-');
-      const newKey = time === oldTimeSlot
-        ? `${day}-${formattedTimeSlot}`
-        : key;
-      newGridData[newKey] = gridData[key];
+    // Filter out any predefined slots that are fully contained within the new slot
+    newTimeSlots = newTimeSlots.filter(slot => {
+      // Keep the slot if:
+      // 1. It's the new slot we just edited
+      if (slot === formattedTimeSlot) return true;
+
+      // 2. It's not a predefined slot
+      if (!predefinedTimeSlots.includes(slot)) return true;
+
+      // 3. It's a predefined slot but not fully contained in the new slot
+      const [slotStart, slotEnd] = slot.split('-');
+      const slotStartMin = parseTimeToMinutes(slotStart);
+      const slotEndMin = parseTimeToMinutes(slotEnd);
+
+      return !(slotStartMin >= newStartMin && slotEndMin <= newEndMin);
     });
 
     const sortedTimeSlots = sortTimeSlots(newTimeSlots);
+
+    // Update grid data - remove any entries in deleted slots
+    const newGridData = {};
+    Object.keys(gridData).forEach(key => {
+      const [day, currentStart, currentEnd] = key.split('-');
+      const currentTimeSlot = `${currentStart}-${currentEnd}`;
+
+      if (currentTimeSlot === oldTimeSlot) {
+        // Update the key with new timeslot
+        const newKey = `${day}-${newStart}-${newEnd}`;
+        newGridData[newKey] = {
+          ...gridData[key],
+          startTime: newStart,
+          endTime: newEnd
+        };
+      } else if (newTimeSlots.includes(currentTimeSlot)) {
+        // Only keep if the timeslot still exists
+        newGridData[key] = gridData[key];
+      }
+    });
 
     setGridData(newGridData);
     setTimeSlots(sortedTimeSlots);
@@ -853,8 +958,11 @@ const saveLectures = async () => {
     setTimetableState(prev => ({
       ...prev,
       gridData: newGridData,
-      timeSlots: sortedTimeSlots
+      timeSlots: sortedTimeSlots,
+      lastSaved: new Date().toISOString()
     }));
+
+    alert(`Timeslot updated to ${formattedTimeSlot}. Contained predefined timeslots were removed.`);
   };
 
   // Handle course selection change
@@ -1088,7 +1196,7 @@ const saveLectures = async () => {
                     disabled={isSaving}
                   >
 
-                      <RefreshCw size={18} />
+                    <RefreshCw size={18} />
                     <span className="hidden sm:inline">ReFresh</span>
                     <span className="sm:hidden "></span>
                   </Button>
@@ -1208,41 +1316,64 @@ const saveLectures = async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map((day, dayIndex) => (
-                      <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
-                          {day}
-                        </td>
-                        {timeSlots.map((time) => {
-                          const cellData = gridData[`${day}-${time}`];
-                          return (
-                            <td
-                              key={`${day}-${time}`}
-                              className="border-r border-gray-200 p-3 text-center cursor-pointer hover:bg-indigo-50 transition-colors duration-200 h-24 min-w-[140px]"
-                              onClick={() => handleCellClick(day, time)}
-                            >
-                              {cellData ? (
-                                <div className="space-y-1">
-                                  <div className="font-semibold text-indigo-700 text-sm leading-tight">
-                                    {cellData.subject}
+                    {days.map((day, dayIndex) => {
+                      const groupedLectures = groupConsecutiveTimeSlots(gridData, [day], timeSlots);
+
+                      return (
+                        <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
+                            {day}
+                          </td>
+                          {timeSlots.map((time, timeIndex) => {
+                            const cellKey = `${day}-${time}`;
+                            const lecture = gridData[cellKey];
+                            const groupedLecture = groupedLectures[cellKey];
+
+                            // Skip rendering if this is part of a group but not the first in the group
+                            if (groupedLecture?.isGrouped && groupedLecture.timeSlots[0] !== time) {
+                              return null;
+                            }
+
+                            // Calculate colSpan for grouped lectures
+                            const colSpan = groupedLecture?.isGrouped
+                              ? groupedLecture.timeSlots.length
+                              : 1;
+
+                            return (
+                              <td
+                                key={cellKey}
+                                className={`border-r border-gray-200 p-3 text-center cursor-pointer hover:bg-indigo-50 transition-colors duration-200 h-24 ${colSpan > 1 ? 'bg-blue-50' : ''}`}
+                                onClick={() => handleCellClick(day, time)}
+                                colSpan={colSpan}
+                              >
+                                {lecture ? (
+                                  <div className="space-y-1">
+                                    <div className="font-semibold text-indigo-700 text-sm leading-tight">
+                                      {lecture.subject}
+                                    </div>
+                                    <div className="text-xs text-gray-600 font-medium">
+                                      {lecture.code}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {lecture.faculty}
+                                    </div>
+                                    {colSpan > 1 && (
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="text-xs text-gray-600 font-medium">
-                                    {cellData.code}
+                                ) : (
+                                  <div className="text-gray-400 text-sm font-medium">
+                                    Click to add
                                   </div>
-                                  <div className="text-xs text-gray-500">
-                                    {cellData.faculty}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-gray-400 text-sm font-medium">
-                                  Click to add
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
