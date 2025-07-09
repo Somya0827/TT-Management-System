@@ -152,6 +152,8 @@ function ViewTimeTable() {
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedFaculty, setSelectedFaculty] = useState("all");
   const [selectedSemester, setSelectedSemester] = useState("all");
+  const [selectedRoom, setSelectedRoom] = useState("all");
+  const [rooms, setRooms] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [monthSummary, setMonthSummary] = useState([]);
   const [dayDetails, setDayDetails] = useState([]);
@@ -180,6 +182,7 @@ function ViewTimeTable() {
     CALENDAR: `${API_BASE_URL}/calendar`,
     CALENDAR_DAY: `${API_BASE_URL}/calendar/day`,
     SESSION: `${API_BASE_URL}/session`,
+    GET_ROOMS: `${API_BASE_URL}/room`,
   };
 
   // Memoized values
@@ -189,6 +192,7 @@ function ViewTimeTable() {
   const memoizedLectures = useMemo(() => lectures, [lectures]);
   const memoizedMonthSummary = useMemo(() => monthSummary, [monthSummary]);
   const memoizedDayDetails = useMemo(() => dayDetails, [dayDetails]);
+  const memoizedRooms = useMemo(() => rooms, [rooms]);
 
   // Calendar cache
   const calendarCache = useRef({});
@@ -202,6 +206,7 @@ function ViewTimeTable() {
         await Promise.all([
           fetchCourses(),
           fetchFaculties(),
+           fetchRooms(),
           fetchLectures(),
         ]);
       } catch (err) {
@@ -317,7 +322,7 @@ function ViewTimeTable() {
   };
 
   const fetchMonthSummary = async () => {
-    const cacheKey = `${currentDate.getMonth()}-${currentDate.getFullYear()}-${selectedCourse}-${selectedFaculty}-${selectedSemester}`;
+    const cacheKey = `${currentDate.getMonth()}-${currentDate.getFullYear()}-${selectedCourse}-${selectedFaculty}-${selectedSemester}-${selectedRoom}`;
 
     if (calendarCache.current[cacheKey]) {
       setMonthSummary(calendarCache.current[cacheKey]);
@@ -336,6 +341,7 @@ function ViewTimeTable() {
       if (selectedSemester !== "all") params.append('semester', selectedSemester);
       if (selectedCourse !== "all") params.append('course_id', selectedCourse);
       if (selectedFaculty !== "all") params.append('faculty_id', selectedFaculty);
+      if (selectedRoom !== "all") params.append('room_id', selectedRoom);
 
       const response = await fetch(`${API_ENDPOINTS.CALENDAR}?${params}`, {
         method: 'GET',
@@ -358,6 +364,23 @@ function ViewTimeTable() {
     }
   };
 
+  const fetchRooms = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.GET_ROOMS, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      setRooms([]);
+      throw error;
+    }
+  };
+
   const fetchDayDetails = async (date) => {
     setLoading(true);
     try {
@@ -370,6 +393,7 @@ function ViewTimeTable() {
       if (selectedSemester !== "all") params.append('semester', selectedSemester);
       if (selectedCourse !== "all") params.append('course_id', selectedCourse);
       if (selectedFaculty !== "all") params.append('faculty_id', selectedFaculty);
+      if (selectedRoom !== "all") params.append('room_id', selectedRoom);
 
       const response = await fetch(`${API_ENDPOINTS.CALENDAR_DAY}?${params}`, {
         method: 'GET',
@@ -535,6 +559,9 @@ function ViewTimeTable() {
       case 'semester':
         setSelectedSemester(value);
         break;
+      case 'room':
+        setSelectedRoom(value);
+        break;
       default:
         break;
     }
@@ -631,6 +658,19 @@ function ViewTimeTable() {
                     <option value="all">All Semesters</option>
                     {memoizedSemesters.map(s => (
                       <option key={s.ID} value={s.ID}>{getSemesterDisplayName(s.Name)}</option>
+                    ))}
+                  </>
+                }
+              />
+               <FilterSelect
+                label="Room"
+                value={selectedRoom}
+                onChange={(e) => handleFilterChange('room', e.target.value)}
+                options={
+                  <>
+                    <option value="all">All Rooms</option>
+                    {memoizedRooms.map(r => (
+                      <option key={r.ID} value={r.ID}>{r.Name || `Room ${r.ID}`}</option>
                     ))}
                   </>
                 }

@@ -464,7 +464,7 @@ const ClassTimeTable = () => {
               <h1 className="text-xl font-bold text-white">View Timetable</h1>
               <p className="text-indigo-100 text-sm mt-1">View academic schedules</p>
             </div>
-            <div>
+            {/* <div>
               <Button
                 className="bg-gradient-to-l from-indigo-600 to-blue-600 border-1 text-white px-2 py-2 rounded-lg transition-colors duration-200 text-sm font-medium md:px-4"
                 onClick={() => navigate("/dashboard")}
@@ -472,7 +472,7 @@ const ClassTimeTable = () => {
                 <span className="hidden sm:inline">Back to DashBoard</span>
                 <span className="sm:hidden">Back</span>
               </Button>
-            </div>
+            </div> */}
           </div>
 
           <div className="p-6">
