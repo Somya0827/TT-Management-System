@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Calendar,
   Clock,
@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { GiTeacher } from "react-icons/gi";
+import academicData from "../assets/academicData.json";
 const Spinner = ({ className = "w-12 h-12" }) => (
   <svg
     className={`animate-spin text-blue-500 ${className}`}
@@ -90,6 +91,86 @@ const StatusBadge = ({ status, onClick, disabled = false }) => {
   );
 };
 
+const StatusModal = React.memo(({ session, onClose, onUpdate }) => {
+  const [selectedStatus, setSelectedStatus] = useState(session.status || 'held');
+  const statusModalRef = useRef(null);
+
+  const statusOptions = [
+    { value: 'held', label: 'Class Taken', color: 'green', icon: Check },
+    { value: 'cancelled', label: 'Class Missed', color: 'red', icon: X },
+    { value: "", label: 'No Entry', color: 'yellow', icon: AlertTriangle },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div
+        ref={statusModalRef}
+        className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Update Attendance Status</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-gray-700 mb-2">
+            <span className="font-semibold">Subject:</span> {session.subject || 'N/A'}
+          </p>
+          <p className="text-gray-700 mb-2">
+            <span className="font-semibold">Time:</span> {session.start_time}-{session.end_time}
+          </p>
+          <p className="text-gray-700 mb-2">
+            <span className="font-semibold">Faculty:</span> {session.faculty || 'N/A'}
+          </p>
+          <p className="text-gray-700">
+            <span className="font-semibold">Room:</span> {session.room || 'N/A'}
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-6">
+          {statusOptions.map((option) => (
+            <div
+              key={option.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedStatus(option.value);
+              }}
+              className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${selectedStatus === option.value
+                ? `border-${option.color}-500 bg-${option.color}-50`
+                : 'border-gray-200 hover:bg-gray-50'
+                }`}
+            >
+              <option.icon className={`w-5 h-5 text-${option.color}-600`} />
+              <span className="font-medium">{option.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate(session.session_id, selectedStatus);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            Update Status
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 function MarkAttendance() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [sessions, setSessions] = useState([]);
@@ -100,11 +181,15 @@ function MarkAttendance() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [expandedSession, setExpandedSession] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedSessionForModal, setSelectedSessionForModal] = useState(null);
 
   // Filter and Course data
   const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
   const [faculties, setFaculties] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState("all");
+  const [selectedSemester, setSelectedSemester] = useState("all");
   const [selectedFaculty, setSelectedFaculty] = useState("all");
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -126,7 +211,7 @@ function MarkAttendance() {
     if (!initialLoading) {
       fetchSessions();
     }
-  }, [selectedDate, selectedCourse, selectedFaculty, initialLoading]);
+  }, [selectedDate, selectedCourse, selectedSemester, selectedFaculty, initialLoading]);
 
   // Apply filters to sessions
   useEffect(() => {
@@ -137,6 +222,7 @@ function MarkAttendance() {
     setInitialLoading(true);
     try {
       await Promise.all([fetchCourses(), fetchFaculties()]);
+      setSemesters(academicData.semesters || []);
     } catch (err) {
       setError("Failed to fetch initial data");
       console.error("Error fetching initial data:", err);
@@ -183,6 +269,7 @@ function MarkAttendance() {
     try {
       const params = new URLSearchParams({ date: selectedDate });
       if (selectedCourse !== "all") params.append('course_id', selectedCourse);
+      if (selectedSemester !== "all") params.append('semester', selectedSemester);
       if (selectedFaculty !== "all") params.append('faculty_id', selectedFaculty);
 
       const response = await fetch(`${API_ENDPOINTS.CALENDAR_DAY}?${params}`, {
@@ -296,19 +383,43 @@ function MarkAttendance() {
       );
 
       setError(null);
+      setShowStatusModal(false);
+      setSelectedSessionForModal(null);
     } catch (err) {
       console.error("Error marking attendance:", err);
       setError(`Failed to mark attendance: ${err.message}`);
     }
   };
 
-  const getTimeStatus = (startTime, endTime) => {
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const handleStatusBadgeClick = (session) => {
+    setSelectedSessionForModal(session);
+    setShowStatusModal(true);
+  };
 
-    if (currentTime < startTime) return 'upcoming';
-    if (currentTime > endTime) return 'past';
-    return 'current';
+  const closeStatusModal = () => {
+    setShowStatusModal(false);
+    setSelectedSessionForModal(null);
+  };
+
+  const getTimeStatus = (startTime, endTime) => {
+    const today = new Date();
+    const sessionDate = new Date(selectedDate);
+
+
+    today.setHours(0, 0, 0, 0);
+    sessionDate.setHours(0, 0, 0, 0);
+
+    const currentTime = `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`;
+
+    if (sessionDate.getTime() > today.getTime()) {
+      return 'upcoming';
+    } else if (sessionDate.getTime() < today.getTime()) {
+      return 'past';
+    } else {
+      if (currentTime < startTime) return 'upcoming';
+      if (currentTime > endTime) return 'past';
+      return 'current';
+    }
   };
 
   const formatTime = (time) => {
@@ -339,18 +450,7 @@ function MarkAttendance() {
         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Back to Dashboard Button - Minimal Design */}
-              {/* <button
-                onClick={() => window.history.back()}
-                className="flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-2 bg-gradient-to-l from-indigo-600 to-blue-600 border-1 text-white px-2 py-2 rounded-lg transition-colors duration-200 sm:rounded-lg group"
-                title="Back to Dashboard"
-              >
-                <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline sm:ml-2 text-sm font-medium">Back</span>
-              </button> */}
-
               <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800 flex items-center gap-2 sm:gap-3">
-                {/* <Check className="w-8 h-8 sm:w-10 sm:h-10" /> */}
                 Mark Attendance
               </h1>
             </div>
@@ -379,7 +479,7 @@ function MarkAttendance() {
 
           {/* Filters Row */}
           <div className="flex flex-col lg:flex-row gap-4 mt-6">
-            {/* Course and Faculty Filters */}
+            {/* Course, Semester and Faculty Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex flex-col">
                 <label className="text-sm font-semibold text-gray-600 mb-1">Course</label>
@@ -391,6 +491,20 @@ function MarkAttendance() {
                   <option value="all">All Courses</option>
                   {courses.map(c => (
                     <option key={c.ID} value={c.ID}>{c.Name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-sm font-semibold text-gray-600 mb-1">Semester</label>
+                <select
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm min-w-[160px]"
+                >
+                  <option value="all">All Semesters</option>
+                  {semesters.map(s => (
+                    <option key={s.ID} value={s.ID || s.number}>{s.Name || `Semester ${s.number}`}</option>
                   ))}
                 </select>
               </div>
@@ -459,7 +573,7 @@ function MarkAttendance() {
         </div>
 
         {/* Sessions List */}
-<div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Spinner />
@@ -527,10 +641,7 @@ function MarkAttendance() {
                       <div className="flex items-center gap-4">
                         <StatusBadge
                           status={session.status}
-                          onClick={() => {
-                            const newStatus = session.status === 'held' ? 'cancelled' : 'held';
-                            markAttendance(session.session_id, newStatus);
-                          }}
+                          onClick={() => handleStatusBadgeClick(session)}
                         />
 
                         <button
@@ -585,6 +696,7 @@ function MarkAttendance() {
             </div>
           )}
         </div>
+
         {/* Summary Stats */}
         {filteredSessions.length > 0 && (
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -627,6 +739,15 @@ function MarkAttendance() {
           </div>
         )}
       </div>
+
+      {/* StatusModal */}
+      {showStatusModal && selectedSessionForModal && (
+        <StatusModal
+          session={selectedSessionForModal}
+          onClose={closeStatusModal}
+          onUpdate={markAttendance}
+        />
+      )}
 
       {/* Error Toast */}
       {error && (
