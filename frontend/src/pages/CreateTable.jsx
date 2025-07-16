@@ -110,7 +110,7 @@ const CreateTable = () => {
   const [faculties, setFaculties] = useState([]);
   const [rooms, setRooms] = useState([]);
 
-  const API_BASE_URL = "http://localhost:8080/api/v1";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
     GET_COURSE: `${API_BASE_URL}/course`,
     GET_BATCH: `${API_BASE_URL}/batch`,

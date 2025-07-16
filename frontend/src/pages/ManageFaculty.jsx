@@ -11,7 +11,7 @@ const toastCustomStyles = `
       margin: 20px ;
       width: calc(100% - 40px);
       padding: 14px ;
-      border-radius: 8px; 
+      border-radius: 8px;
     }
   }
 `;
@@ -33,7 +33,7 @@ const ManageFaculty = () => {
 
     const navigate = useNavigate();
 
-    const API_BASE_URL = "http://localhost:8080/api/v1";
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const API_ENDPOINTS = {
         GET_FACULTIES: `${API_BASE_URL}/faculty`,
         ADD_FACULTY: `${API_BASE_URL}/faculty`,
@@ -136,7 +136,7 @@ const ManageFaculty = () => {
             <div>
                 <div className="mb-2">Are you sure you want to delete this faculty member?</div>
                 <div className="flex justify-end space-x-2 mt-2">
-                    <button 
+                    <button
                         onClick={() => {
                             toast.dismiss();
                             performDelete(id);
@@ -145,8 +145,8 @@ const ManageFaculty = () => {
                     >
                         Delete
                     </button>
-                    <button 
-                        onClick={() => toast.dismiss()} 
+                    <button
+                        onClick={() => toast.dismiss()}
                         className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                     >
                         Cancel
@@ -245,7 +245,7 @@ const ManageFaculty = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
              <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
-             <ToastContainer 
+             <ToastContainer
                 position="top-right"
                 autoClose={5000}
                 hideProgressBar={false}

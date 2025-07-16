@@ -8,7 +8,7 @@ import Rooms from "../pages/ManageRooms";
 import PrivateRoute from "../components/PrivateRoute";
 import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../components/LoadingScreen";
-import AdminDashboard from "../pages/logPage/AdminDashboard";    // for future use
+import AdminDashboard from "../pages/logPage/AdminDashboard";
 import FacultyDashboard from "../pages/logPage/FacultyDashboard";
 import UpdateTimeTable from "../pages/ViewTimeTable";
 import ManageCourses from "../pages/ManageCourses";

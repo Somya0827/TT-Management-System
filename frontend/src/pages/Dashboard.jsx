@@ -8,7 +8,7 @@ import {
   FaPlus,
   FaEdit,
   FaUserTie, FaSpinner, FaExclamationTriangle,
-  FaLayerGroup, 
+  FaLayerGroup,
 } from "react-icons/fa";
 import { SiBasicattentiontoken } from "react-icons/si";
 import { FaTableCells } from "react-icons/fa6";
@@ -27,7 +27,7 @@ const Dashboard = () => {
   });
     const { userRole } = useUserRole();
 
-  const API_BASE_URL = "http://localhost:8080/api/v1";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
     FACULTY_COUNT: `${API_BASE_URL}/faculty`,
     SUBJECT_COUNT: `${API_BASE_URL}/subject`,

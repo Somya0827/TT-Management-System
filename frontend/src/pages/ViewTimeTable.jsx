@@ -174,7 +174,7 @@ function ViewTimeTable() {
   const [lectures, setLectures] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const API_BASE_URL = "http://localhost:8080/api/v1";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
     GET_COURSE: `${API_BASE_URL}/course`,
     GET_FACULTY: `${API_BASE_URL}/faculty`,

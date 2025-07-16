@@ -11,7 +11,7 @@ const toastCustomStyles = `
       margin: 20px ;
       width: calc(100% - 40px);
       padding: 14px ;
-      border-radius: 8px; 
+      border-radius: 8px;
     }
   }
 `;
@@ -35,7 +35,7 @@ const ManageSubjects = () => {
 
     const navigate = useNavigate();
 
-    const API_BASE_URL = "http://localhost:8080/api/v1";
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const API_ENDPOINTS = {
         GET_SUBJECTS: `${API_BASE_URL}/subject`,
         GET_COURSES: `${API_BASE_URL}/course`,
@@ -120,7 +120,7 @@ const handleSaveNewSubject = async () => {
 
     try {
         setAddingSubject(true);
-        
+
         const subjectData = {
             name: newSubject.name.trim(),
             code: newSubject.code.trim().toUpperCase(),
@@ -129,7 +129,7 @@ const handleSaveNewSubject = async () => {
 
         // Determine if we're updating or creating
         const isUpdate = !!newSubject.id;
-        const endpoint = isUpdate 
+        const endpoint = isUpdate
             ? API_ENDPOINTS.UPDATE_SUBJECT(newSubject.id)
             : API_ENDPOINTS.ADD_SUBJECT;
         const method = isUpdate ? 'PUT' : 'POST';
@@ -165,7 +165,7 @@ const handleSaveNewSubject = async () => {
             <div>
                 <div className="mb-2">Are you sure you want to delete this subject?</div>
                 <div className="flex justify-end space-x-2 mt-2">
-                    <button 
+                    <button
                         onClick={() => {
                             toast.dismiss();
                             performDelete(id);
@@ -174,8 +174,8 @@ const handleSaveNewSubject = async () => {
                     >
                         Delete
                     </button>
-                    <button 
-                        onClick={() => toast.dismiss()} 
+                    <button
+                        onClick={() => toast.dismiss()}
                         className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                     >
                         Cancel
@@ -277,7 +277,7 @@ const handleEdit = (id) => {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             {/* Toast Container */}
             <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
-            <ToastContainer 
+            <ToastContainer
                 position="top-right"
                 autoClose={3000}
                 hideProgressBar={false}
@@ -367,7 +367,7 @@ const handleEdit = (id) => {
                                     <tr
                                         key={`desktop-${subject.id}`}
                                         className="hover:bg-blue-50 transition-colors duration-150"
-                                    >                                        
+                                    >
                                         <td className="px-6 py-4">
                                             <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-mono font-medium">
                                                 {subject.code}

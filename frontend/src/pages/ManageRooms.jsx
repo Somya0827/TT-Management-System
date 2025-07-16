@@ -11,7 +11,7 @@ const toastCustomStyles = `
       margin: 20px ;
       width: calc(100% - 40px);
       padding: 14px ;
-      border-radius: 8px; 
+      border-radius: 8px;
     }
   }
 `;
@@ -34,7 +34,7 @@ const ManageRooms = () => {
 
     const navigate = useNavigate();
 
-    const API_BASE_URL = "http://localhost:8080/api/v1";
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const API_ENDPOINTS = {
         GET_ROOMS: `${API_BASE_URL}/room`,
         ADD_ROOM: `${API_BASE_URL}/room`,
@@ -46,7 +46,7 @@ const ManageRooms = () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             const response = await fetch(API_ENDPOINTS.GET_ROOMS, {
                 method: 'GET',
                 headers: {
@@ -92,7 +92,7 @@ const ManageRooms = () => {
         try {
             editingRoom ? setEditingRoom(true) : setAddingRoom(true);
 
-            const endpoint = editingRoom 
+            const endpoint = editingRoom
                 ? API_ENDPOINTS.UPDATE_ROOM(newRoom.ID)
                 : API_ENDPOINTS.ADD_ROOM;
 
@@ -141,7 +141,7 @@ const ManageRooms = () => {
             <div>
                 <div className="mb-2">Are you sure you want to delete this room?</div>
                 <div className="flex justify-end space-x-2 mt-2">
-                    <button 
+                    <button
                         onClick={() => {
                             toast.dismiss();
                             performDelete(id);
@@ -150,8 +150,8 @@ const ManageRooms = () => {
                     >
                         Delete
                     </button>
-                    <button 
-                        onClick={() => toast.dismiss()} 
+                    <button
+                        onClick={() => toast.dismiss()}
                         className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                     >
                         Cancel
@@ -254,7 +254,7 @@ const ManageRooms = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
-            <ToastContainer 
+            <ToastContainer
                     position="top-right"
                     autoClose={3000}
                     hideProgressBar={false}
@@ -343,7 +343,7 @@ const ManageRooms = () => {
                                     <tr
                                         key={`desktop-${room.ID}`}
                                         className="hover:bg-blue-50 transition-colors duration-150"
-                                    >                                        
+                                    >
                                         <td className="px-6 py-4 w-1/2">
                                             <div className="font-medium text-slate-800">{room.Name}</div>
                                         </td>

@@ -11,7 +11,7 @@ const toastCustomStyles = `
       margin: 20px ;
       width: calc(100% - 40px);
       padding: 14px ;
-      border-radius: 8px; 
+      border-radius: 8px;
     }
   }
 `;
@@ -33,7 +33,7 @@ const ManageCourses = () => {
  const { userRole } = useUserRole();
     const navigate = useNavigate();
 
-    const API_BASE_URL = "http://localhost:8080/api/v1";
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const API_ENDPOINTS = {
         // Modified to include subjects and batches
         GET_COURSES: `${API_BASE_URL}/course?include=subjects,batches`,
@@ -47,7 +47,7 @@ const ManageCourses = () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             const response = await fetch(API_ENDPOINTS.GET_COURSES, {
                 method: 'GET',
                 headers: {
@@ -61,10 +61,10 @@ const ManageCourses = () => {
             }
 
             const data = await response.json();
-            
+
             // Debug: Log the response to see the actual structure
             // console.log('API Response:', data);
-            
+
             setCourses(data);
             setFilteredCourses(data);
         } catch (err) {
@@ -80,7 +80,7 @@ const ManageCourses = () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             // First, get all courses
             const coursesResponse = await fetch(`${API_BASE_URL}/course`, {
                 method: 'GET',
@@ -95,7 +95,7 @@ const ManageCourses = () => {
             }
 
             const coursesData = await coursesResponse.json();
-            
+
             // Then, for each course, fetch its subjects and batches
             const coursesWithDetails = await Promise.all(
                 coursesData.map(async (course) => {
@@ -105,13 +105,13 @@ const ManageCourses = () => {
                             credentials: 'include'
                         });
                         const subjects = subjectsResponse.ok ? await subjectsResponse.json() : [];
-                        
+
                         // Fetch batches for this course
                         const batchesResponse = await fetch(`${API_BASE_URL}/course/${course.ID}/batches`, {
                             credentials: 'include'
                         });
                         const batches = batchesResponse.ok ? await batchesResponse.json() : [];
-                        
+
                         return {
                             ...course,
                             Subjects: subjects,
@@ -127,7 +127,7 @@ const ManageCourses = () => {
                     }
                 })
             );
-            
+
             setCourses(coursesWithDetails);
             setFilteredCourses(coursesWithDetails);
         } catch (err) {
@@ -163,7 +163,7 @@ const ManageCourses = () => {
         try {
             editingCourse ? setEditingCourse(true) : setAddingCourse(true);
 
-            const endpoint = editingCourse 
+            const endpoint = editingCourse
                 ? API_ENDPOINTS.UPDATE_COURSE(newCourse.id)
                 : API_ENDPOINTS.ADD_COURSE;
 
@@ -210,7 +210,7 @@ const ManageCourses = () => {
             <div>
                 <div className="mb-2">Are you sure you want to delete this course?</div>
                 <div className="flex justify-end space-x-2 mt-2">
-                    <button 
+                    <button
                         onClick={() => {
                             toast.dismiss();
                             performDelete(id);
@@ -219,8 +219,8 @@ const ManageCourses = () => {
                     >
                         Delete
                     </button>
-                    <button 
-                        onClick={() => toast.dismiss()} 
+                    <button
+                        onClick={() => toast.dismiss()}
                         className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                     >
                         Cancel
@@ -333,7 +333,7 @@ const ManageCourses = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
              <style dangerouslySetInnerHTML={{ __html: toastCustomStyles }} />
-            <ToastContainer 
+            <ToastContainer
                     position="top-right"
                     autoClose={3000}
                     hideProgressBar={false}
@@ -420,7 +420,7 @@ const ManageCourses = () => {
                                     <tr
                                         key={`desktop-${course.ID}`}
                                         className="hover:bg-blue-50 transition-colors duration-150"
-                                    >                                        
+                                    >
                                         <td className="px-6 py-4 w-1/2">
                                             <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-mono font-medium">
                                                 {course.Code}
