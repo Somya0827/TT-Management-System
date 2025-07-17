@@ -189,8 +189,8 @@ const Dashboard = () => {
 
   const actionCards = [
     {
-      title: "Mark Attendence",
-      description: "Mark the daily attendence",
+      title: "Mark Lectures",
+      description: "Mark the daily lectures",
       icon: SiBasicattentiontoken,
       iconColor: "bg-red-500",
       hoverColor: "hover:bg-red-50",
