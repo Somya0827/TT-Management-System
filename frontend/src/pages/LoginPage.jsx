@@ -4,6 +4,7 @@ import { RiLockPasswordFill } from "react-icons/ri";
 import { CiLogin } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { toast } from 'react-toastify';
 import logo from "..//assets/iips.png";
 
 
@@ -15,6 +16,18 @@ const LoginPage = () => {
 
   const handleLogin = async (event) => {
     event.preventDefault();
+    
+    // Validation
+    if (!username.trim()) {
+      toast.error("Please enter your username");
+      return;
+    }
+    
+    if (!password.trim()) {
+      toast.error("Please enter your password");
+      return;
+    }
+    
     await login(username, password);
     // console.log("Login attempted with:", username, password);
   };

@@ -35,6 +35,9 @@ const ViewTimeTable = () => {
     room: null
   });
 
+  // State to track if semester was auto-selected
+  const [isSemesterAutoSelected, setIsSemesterAutoSelected] = useState(false);
+
   // State for loading and error handling
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -333,16 +336,35 @@ const ViewTimeTable = () => {
       faculty: null,
       room: null
     });
+    setIsSemesterAutoSelected(false);
   };
 
   const handleBatchChange = (value) => {
-    setSelectedFilters(prev => ({
-      ...prev,
-      batch: value === "placeholder" ? null : value,
-      semester: null,
-      faculty: null,
-      room: null
-    }));
+    if (value === "placeholder") {
+      setSelectedFilters(prev => ({
+        ...prev,
+        batch: null,
+        semester: null,
+        faculty: null,
+        room: null
+      }));
+      setIsSemesterAutoSelected(false);
+    } else {
+      // Extract batch year from the batch value (format: "YYYY-Section")
+      const batchYear = value.split('-')[0];
+      
+      // Calculate and auto-select current semester
+      const currentSemester = calculateCurrentSemester(batchYear);
+      
+      setSelectedFilters(prev => ({
+        ...prev,
+        batch: value,
+        semester: currentSemester,
+        faculty: null,
+        room: null
+      }));
+      setIsSemesterAutoSelected(true);
+    }
   };
 
   const handleSemesterChange = (value) => {
@@ -352,6 +374,8 @@ const ViewTimeTable = () => {
       faculty: null,
       room: null
     }));
+    // Clear auto-selected flag when manually changing semester
+    setIsSemesterAutoSelected(false);
   };
 
   const handleFacultyChange = (value) => {
@@ -362,6 +386,7 @@ const ViewTimeTable = () => {
       semester: null,
       room: null
     });
+    setIsSemesterAutoSelected(false);
   };
 
   const handleRoomChange = (value) => {
@@ -372,6 +397,7 @@ const ViewTimeTable = () => {
       semester: null,
       faculty: null
     });
+    setIsSemesterAutoSelected(false);
   };
 
   // Button handlers
@@ -395,12 +421,42 @@ const ViewTimeTable = () => {
       faculty: null,
       room: null
     });
+    setIsSemesterAutoSelected(false);
     setLectures([]);
     setGridData({});
     setAllTimeSlots(Array.isArray(academicData.timeSlots) ? sortTimeSlots(academicData.timeSlots) : []);
   };
 
   // Utility functions
+  const calculateCurrentSemester = (batchYear) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
+    
+    // Calculate academic year - if current month is before June (6), we're still in the previous academic year
+    const academicYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+    
+    // Calculate years since batch started
+    const yearsSinceStart = academicYear - parseInt(batchYear);
+    
+    // Calculate semester based on years and current month
+    // If current month is June-December (6-12), it's odd semester (1, 3, 5, 7)
+    // If current month is January-May (1-5), it's even semester (2, 4, 6, 8)
+    let semester;
+    if (currentMonth >= 6) {
+      // Odd semester (July-December)
+      semester = (yearsSinceStart * 2) + 1;
+    } else {
+      // Even semester (January-June)
+      semester = (yearsSinceStart * 2);
+    }
+    
+    // Ensure semester is within valid range (1-10 based on academicData)
+    semester = Math.max(1, Math.min(10, semester));
+    
+    return semester.toString();
+  };
+
   const romanToInteger = (roman) => {
     if (typeof roman === 'number' || !isNaN(roman)) {
       return parseInt(roman);
@@ -569,6 +625,14 @@ const ViewTimeTable = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                {isSemesterAutoSelected && selectedFilters.batch && selectedFilters.semester && (
+                  <div className="text-xs text-indigo-600 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    Auto-selected current semester
+                  </div>
+                )}
               </div>
 
               {/* Faculty Select */}

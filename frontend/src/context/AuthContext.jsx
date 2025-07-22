@@ -3,6 +3,7 @@ import axios from "../services/api.js";
 import { useNavigate } from "react-router-dom";
 import backendService from "../services/backendservice.js";
 import { useUserRole } from '../context/UserRoleContext';
+import { toast } from 'react-toastify';
 
 const AuthContext = createContext();
 
@@ -41,23 +42,24 @@ export const AuthProvider = ({ children }) => {
         credentials: "include",
         body: JSON.stringify({ username, password }),
       });
-      // setUser({ username: res.data.username, role: res.data.role });
-      // if (res.data.role === "Admin") {
-      //   navigate("/dashboard");
-      // } else {
-      //   navigate("/faculty-dashboard");
-      // }
 
-      const data = res.data;
+      const data = await res.json();
       console.log(data, res.status);
 
       if (res.status === 200) {
         await fetchUserRole(username);
+        toast.success("Login successful!");
         navigate("/dashboard");
+      } else if (res.status === 401) {
+        toast.error("Invalid username or password");
+      } else if (res.status === 404) {
+        toast.error("User not found");
+      } else {
+        toast.error("Login failed. Please try again.");
       }
     } catch (err) {
       console.error("Login failed", err);
-      alert(err.message);
+      toast.error("Network error. Please check your connection.");
     }
   };
 

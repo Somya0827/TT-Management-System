@@ -111,6 +111,9 @@ const CreateTimeTable = () => {
   const [rooms, setRooms] = useState([]);
   const [lastUsedRoom, setLastUsedRoom] = useState("");
 
+  // State to track if semester was auto-selected
+  const [isSemesterAutoSelected, setIsSemesterAutoSelected] = useState(false);
+
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
     GET_COURSE: `${API_BASE_URL}/course`,
@@ -378,6 +381,7 @@ const CreateTimeTable = () => {
     setGridData({});
     setTimeSlots(defaultTimeSlots);
     setLastUsedRoom(""); // Clear last used room when resetting
+    setIsSemesterAutoSelected(false); // Reset auto-selected semester flag
     setTimetableState({
       id: null,
       gridData: {},
@@ -671,6 +675,36 @@ const CreateTimeTable = () => {
     return semesters.filter(semester => true);
   };
 
+  // Calculate current semester based on batch year and current date
+  const calculateCurrentSemester = (batchYear) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
+    
+    // Calculate academic year - if current month is before June (6), we're still in the previous academic year
+    const academicYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+    
+    // Calculate years since batch started
+    const yearsSinceStart = academicYear - parseInt(batchYear);
+    
+    // Calculate semester based on years and current month
+    // If current month is June-December (6-12), it's odd semester (1, 3, 5, 7)
+    // If current month is January-May (1-5), it's even semester (2, 4, 6, 8)
+    let semester;
+    if (currentMonth >= 6) {
+      // Odd semester (July-December)
+      semester = (yearsSinceStart * 2) + 1;
+    } else {
+      // Even semester (January-June)
+      semester = (yearsSinceStart * 2);
+    }
+    
+    // Ensure semester is within valid range (1-10 based on academicData)
+    semester = Math.max(1, Math.min(10, semester));
+    
+    return semester.toString();
+  };
+
   const parseTimeToMinutes = (timeStr) => {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
@@ -841,6 +875,7 @@ const CreateTimeTable = () => {
       setGridData(defaultGridData);
       setTimeSlots(defaultTimeSlots);
       setLastUsedRoom(""); // Clear last used room when clearing timetable
+      setIsSemesterAutoSelected(false); // Reset auto-selected semester flag
       setTimetableState({
         id: null,
         gridData: defaultGridData,
@@ -1016,6 +1051,7 @@ const CreateTimeTable = () => {
       batch: "",
       semester: ""
     });
+    setIsSemesterAutoSelected(false);
     setShowTimetable(false);
     setIsLocked(false);
   };
@@ -1027,10 +1063,13 @@ const CreateTimeTable = () => {
       semester: value,
       semester_id: value
     });
+    // Clear auto-selected flag when manually changing semester
+    setIsSemesterAutoSelected(false);
     setShowTimetable(false);
     setIsLocked(false);
   };
   const refresh = () => {
+    setIsSemesterAutoSelected(false);
     window.location.reload();
   };
 
@@ -1101,11 +1140,18 @@ const CreateTimeTable = () => {
                   disabled={isLocked || loading || !batchDetails.course}
                   value={batchDetails.batch}
                   onValueChange={(value) => {
+                    // Extract batch year from the batch value (format: "YYYY-Section")
+                    const batchYear = value.split('-')[0];
+                    
+                    // Calculate and auto-select current semester
+                    const currentSemester = calculateCurrentSemester(batchYear);
+                    
                     setBatchDetails({
                       ...batchDetails,
                       batch: value,
-                      semester: ""
+                      semester: currentSemester
                     });
+                    setIsSemesterAutoSelected(true);
                     setShowTimetable(false);
                     setIsLocked(false);
                   }}
@@ -1152,6 +1198,14 @@ const CreateTimeTable = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                {isSemesterAutoSelected && batchDetails.batch && batchDetails.semester && (
+                  <div className="text-xs text-indigo-600 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    Auto-selected current semester
+                  </div>
+                )}
               </div>
             </div>
 
