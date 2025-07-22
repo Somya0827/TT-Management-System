@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCcw } from "lucide-react";
 import clsx from 'clsx';
 
-const ClassTimeTable = () => {
+const ViewTimeTable = () => {
   // State for fetched data from APIs (courses, batches, etc.)
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -863,4 +863,4 @@ const ClassTimeTable = () => {
   );
 };
 
-export default ClassTimeTable;
+export default ViewTimeTable;

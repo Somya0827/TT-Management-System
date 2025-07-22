@@ -15,8 +15,9 @@ import ManageCourses from "../pages/ManageCourses";
 import ManageFaculty from "../pages/ManageFaculty";
 import ManageBatches from "../pages/ManageBatches";
 import Attendence from "../pages/MarkAttendance";
-import ClassTimeTable from "../pages/ClassTimeTable";
+import ClassTimeTable from "../pages/ViewTimeTable";
 import ViewCalendar from "../pages/ViewCalendar";
+import ViewTimeTable from "../pages/ViewTimeTable";
 
 
 const AppRoutes = () => {
@@ -110,10 +111,10 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/class-timetable"
+        path="/view-timetable"
         element={
           //<PrivateRoute requiredRoles={["Admin", "Faculty"]}>
-            <ClassTimeTable />
+            <ViewTimeTable />
           //</PrivateRoute>
         }
       />
