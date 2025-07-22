@@ -276,27 +276,92 @@ const ViewTimeTable = () => {
     setGridData({});
 
     try {
-      // Find the selected objects based on their names
-      const selectedCourse = courses.find(c => c.Name === selectedFilters.course);
-      const selectedBatch = batches.find(b => `${b.Year}-${b.Section}` === selectedFilters.batch);
-      const selectedFaculty = faculties.find(f => f.Name === selectedFilters.faculty);
-      const selectedRoom = rooms.find(r => r.Name === selectedFilters.room);
-      const semesterNumber = selectedFilters.semester !== undefined ? romanToInteger(selectedFilters.semester) : undefined;
+      // Find the selected objects based on their IDs/names
+      const selectedCourse = courses.find(c => c.ID === parseInt(selectedFilters.course));
+      
+      // Find batch based on both the Year-Section format AND the selected course
+      const selectedBatch = batches.find(b => {
+        const batchValue = `${b.Year}-${b.Section}`;
+        const matchesFormat = batchValue === selectedFilters.batch;
+        const matchesCourse = selectedFilters.course ? b.CourseID === parseInt(selectedFilters.course) : true;
+        
+        console.log('Checking batch:', batchValue, 'CourseID:', b.CourseID, 'Selected Course ID:', selectedFilters.course);
+        console.log('Matches format:', matchesFormat, 'Matches course:', matchesCourse);
+        
+        return matchesFormat && matchesCourse;
+      });
+      
+      const selectedFaculty = faculties.find(f => f.ID === parseInt(selectedFilters.faculty));
+      const selectedRoom = rooms.find(r => r.ID === parseInt(selectedFilters.room));
+      
+      // Debug logging
+      console.log('=== FETCH LECTURES DEBUG ===');
+      console.log('Selected filters:', selectedFilters);
+      console.log('Found course:', selectedCourse);
+      console.log('Found batch:', selectedBatch);
+      console.log('Found faculty:', selectedFaculty);
+      console.log('Found room:', selectedRoom);
+      
+      // Validate that the batch belongs to the selected course
+      if (selectedBatch && selectedCourse && selectedBatch.CourseID !== selectedCourse.ID) {
+        console.error('MISMATCH: Selected batch does not belong to selected course!');
+        console.error('Batch CourseID:', selectedBatch.CourseID, 'Selected Course ID:', selectedCourse.ID);
+        setError('Selected batch does not belong to the selected course. Please reselect.');
+        return;
+      }
+      
+      // Convert semester to integer if it's a string
+      let semesterNumber;
+      if (selectedFilters.semester !== undefined && selectedFilters.semester !== null) {
+        // If semester is already a number, use it; otherwise convert from roman numeral
+        semesterNumber = typeof selectedFilters.semester === 'number' 
+          ? selectedFilters.semester 
+          : (isNaN(selectedFilters.semester) 
+            ? romanToInteger(selectedFilters.semester) 
+            : parseInt(selectedFilters.semester));
+      }
 
       // Build query parameters
       const queryParams = new URLSearchParams();
 
+      // Log for debugging
+      console.log('Selected batch object:', selectedBatch);
+      console.log('Semester number:', semesterNumber);
+
       if (selectedFaculty) {
         queryParams.append('faculty_id', selectedFaculty.ID);
+        console.log('Using faculty filter - Faculty ID:', selectedFaculty.ID);
       } else if (selectedRoom) {
         queryParams.append('room_id', selectedRoom.ID);
-      } else if (selectedBatch && semesterNumber !== undefined) {
-        queryParams.append('batch_id', selectedBatch.ID);
-        queryParams.append('semester', semesterNumber);
-        if (selectedBatch.Section) {
-          queryParams.append('section', selectedBatch.Section);
+        console.log('Using room filter - Room ID:', selectedRoom.ID);
+      } else if (selectedBatch && semesterNumber !== undefined && selectedCourse) {
+        // Double-check that batch belongs to the course
+        if (selectedBatch.CourseID === selectedCourse.ID) {
+          queryParams.append('batch_id', selectedBatch.ID);
+          queryParams.append('semester', semesterNumber);
+          console.log('Using batch filter - Batch ID:', selectedBatch.ID, 'Semester:', semesterNumber);
+          console.log('Batch belongs to Course:', selectedCourse.Name, 'ID:', selectedCourse.ID);
+          if (selectedBatch.Section) {
+            queryParams.append('section', selectedBatch.Section);
+            console.log('Added section:', selectedBatch.Section);
+          }
+        } else {
+          console.error('ERROR: Batch CourseID mismatch!');
+          console.error('Batch CourseID:', selectedBatch.CourseID, 'Selected Course ID:', selectedCourse.ID);
+          setError('Data inconsistency detected. Please refresh and try again.');
+          return;
         }
+      } else {
+        console.error('No valid filter combination found!');
+        console.log('selectedBatch exists:', !!selectedBatch);
+        console.log('selectedCourse exists:', !!selectedCourse);
+        console.log('semesterNumber defined:', semesterNumber !== undefined);
+        setError('Please ensure all required fields are selected properly.');
+        return;
       }
+
+      console.log('Final query params:', queryParams.toString());
+      console.log('=== END DEBUG ===');
 
       // Fetch lectures
       const response = await fetch(`${API_ENDPOINTS.LECTURE_QUERY}?${queryParams}`, {
@@ -313,6 +378,7 @@ const ViewTimeTable = () => {
         }
       } else {
         const filteredLectures = await response.json();
+        console.log('Fetched lectures:', filteredLectures);
         setLectures(filteredLectures);
 
         // Convert to grid data format and update time slots
@@ -351,10 +417,15 @@ const ViewTimeTable = () => {
       setIsSemesterAutoSelected(false);
     } else {
       // Extract batch year from the batch value (format: "YYYY-Section")
-      const batchYear = value.split('-')[0];
+      const [batchYear, section] = value.split('-');
       
       // Calculate and auto-select current semester
       const currentSemester = calculateCurrentSemester(batchYear);
+      
+      // Log for debugging
+      console.log('Selected batch:', value);
+      console.log('Batch year:', batchYear);
+      console.log('Calculated semester:', currentSemester);
       
       setSelectedFilters(prev => ({
         ...prev,
@@ -402,11 +473,11 @@ const ViewTimeTable = () => {
 
   // Button handlers
   const handleGenerateTimetable = () => {
-    if (selectedFilters.faculty !== undefined ||
-      selectedFilters.room !== undefined ||
-      (selectedFilters.course !== undefined &&
-        selectedFilters.batch !== undefined &&
-        selectedFilters.semester !== undefined)) {
+    if (selectedFilters.faculty !== null ||
+      selectedFilters.room !== null ||
+      (selectedFilters.course !== null &&
+        selectedFilters.batch !== null &&
+        selectedFilters.semester !== null)) {
       fetchLectures();
     } else {
       alert("Please select either Faculty, Room, or complete Course+Batch+Semester combination to generate timetable.");
@@ -454,6 +525,8 @@ const ViewTimeTable = () => {
     // Ensure semester is within valid range (1-10 based on academicData)
     semester = Math.max(1, Math.min(10, semester));
     
+    // Return the semester in the same format as your academicData.semesters
+    // Check if your semesters use roman numerals or numbers
     return semester.toString();
   };
 
@@ -546,7 +619,7 @@ const ViewTimeTable = () => {
                   <SelectContent className="rounded-xl border-2 shadow-lg">
                     <SelectItem value="placeholder">Select course</SelectItem>
                     {courses.map((course) => (
-                      <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
+                      <SelectItem key={course.ID} value={course.ID.toString()} className="rounded-lg">
                         <div className="flex flex-col">
                           <span className="font-medium">{course.Name}</span>
                           {course.Code && (
@@ -574,8 +647,7 @@ const ViewTimeTable = () => {
                     <SelectItem value="placeholder">Select batch</SelectItem>
                     {batches
                       .filter(batch => {
-                        const selectedCourse = courses.find(c => c.Name === selectedFilters.course);
-                        return selectedCourse ? batch.CourseID === selectedCourse.ID : false;
+                        return selectedFilters.course ? batch.CourseID === parseInt(selectedFilters.course) : false;
                       })
                       .sort((a, b) => {
                         if (a.Year !== b.Year) return a.Year - b.Year;
@@ -651,7 +723,7 @@ const ViewTimeTable = () => {
                     {faculties.map((faculty) => (
                       <SelectItem
                         key={faculty.ID}
-                        value={faculty.Name}
+                        value={faculty.ID.toString()}
                         className="rounded-lg"
                       >
                         <div className="flex flex-col">
@@ -682,7 +754,7 @@ const ViewTimeTable = () => {
                     {rooms.map((room) => (
                       <SelectItem
                         key={room.ID}
-                        value={room.Name}
+                        value={room.ID.toString()}
                         className="rounded-lg"
                       >
                         <div className="flex flex-col">
