@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"tms-server/models"
@@ -26,41 +25,33 @@ func QueryLectures(db *gorm.DB) gin.HandlerFunc {
 		query := db.Preload("Batch").Preload("Subject").Preload("Faculty").Preload("Room").
 			Joins("JOIN batches ON batches.id = lectures.batch_id")
 
-		// Build WHERE conditions
-		whereConditions := []string{}
-
 		if batchIDStr != "" {
 			if batchID, err := strconv.Atoi(batchIDStr); err == nil {
 				query = query.Where("batch_id = ?", batchID)
-				whereConditions = append(whereConditions, fmt.Sprintf("batch_id = %d", batchID))
 			}
 		}
 
 		if semesterStr != "" {
 			if semester, err := strconv.Atoi(semesterStr); err == nil {
 				query = query.Where("semester = ?", semester)
-				whereConditions = append(whereConditions, fmt.Sprintf("semester = %d", semester))
 			}
 		}
 
 		if facultyIDStr != "" {
 			if facultyID, err := strconv.Atoi(facultyIDStr); err == nil {
 				query = query.Where("faculty_id = ?", facultyID)
-				whereConditions = append(whereConditions, fmt.Sprintf("faculty_id = %d", facultyID))
 			}
 		}
 
 		if roomIDStr != "" {
 			if roomID, err := strconv.Atoi(roomIDStr); err == nil {
 				query = query.Where("room_id = ?", roomID)
-				whereConditions = append(whereConditions, fmt.Sprintf("room_id = %d", roomID))
 			}
 		}
 
 		if yearStr != "" {
 			if year, err := strconv.Atoi(yearStr); err == nil {
 				query = query.Where("batches.year = ?", year)
-				whereConditions = append(whereConditions, fmt.Sprintf("batches.year = %d", year))
 			} else {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid year parameter"})
 				return
@@ -70,7 +61,6 @@ func QueryLectures(db *gorm.DB) gin.HandlerFunc {
 		if courseIDStr != "" {
 			if courseID, err := strconv.Atoi(courseIDStr); err == nil {
 				query = query.Where("batches.course_id = ?", courseID)
-				whereConditions = append(whereConditions, fmt.Sprintf("batches.course_id = %d", courseID))
 			} else {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid course_id parameter"})
 				return
@@ -79,7 +69,6 @@ func QueryLectures(db *gorm.DB) gin.HandlerFunc {
 
 		if section != "" {
 			query = query.Where("batches.section = ?", section)
-			whereConditions = append(whereConditions, fmt.Sprintf("batches.section = '%s'", section))
 		}
 
 		if err := query.Find(&lectures).Error; err != nil {
