@@ -39,12 +39,16 @@ const Spinner = ({ className = "w-12 h-12" }) => (
 
 const CalendarDay = React.memo(({ day, classes, isToday, onClick }) => {
   const hasClasses = classes.total_held > 0 || classes.total_cancelled > 0;
+  const hasNoDataEntries = classes.no_data > 0;
   let indicator = "bg-gray-300";
 
   if (hasClasses) {
     if (classes.total_cancelled === 0) indicator = "bg-green-500";
     else if (classes.total_held === 0) indicator = "bg-red-500";
     else indicator = "bg-yellow-400";
+  } else if (hasNoDataEntries) {
+    // Show yellow for dates with scheduled classes but no attendance data
+    indicator = "bg-yellow-400";
   }
 
   return (
@@ -146,7 +150,7 @@ const FilterSelect = React.memo(({ label, value, options, onChange }) => (
   </div>
 ));
 
-function ViewTimeTable() {
+function ViewCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState("all");
@@ -542,7 +546,7 @@ function ViewTimeTable() {
 
   const getSemesterDisplayName = useCallback((val) => {
     if (typeof val === 'number') {
-      const numerals = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+      const numerals = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
       return `Semester ${numerals[val] || val}`;
     }
     return `Semester ${val}`;
@@ -691,9 +695,10 @@ function ViewTimeTable() {
           </div>
 
           <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6 p-4 bg-gray-50/80 rounded-lg justify-center">
-            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-500 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">Held</span></div>
-            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">Canceled</span></div>
-            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-300 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">No Entry</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-500 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">All Held</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">All Cancelled</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-400 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">Mixed/Scheduled</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-300 rounded-full shadow-sm"></div><span className="text-sm text-gray-700">No Classes</span></div>
           </div>
 
           <div className="relative">
@@ -739,7 +744,7 @@ function ViewTimeTable() {
                 {[
                   { title: 'Classes Held', value: getClassesForDate(selectedDate).total_held, Icon: Check, color: 'green' },
                   { title: 'Classes Missed', value: getClassesForDate(selectedDate).total_cancelled, Icon: X, color: 'red' },
-                  { title: 'Total Scheduled', value: getClassesForDate(selectedDate).total_held + getClassesForDate(selectedDate).total_cancelled, Icon: Calendar, color: 'gray' },
+                  { title: 'Total Scheduled', value: getClassesForDate(selectedDate).total_held + getClassesForDate(selectedDate).total_cancelled + getClassesForDate(selectedDate).no_data, Icon: Calendar, color: 'gray' },
                 ].map(({ title, value, Icon, color }) => (
                   <div key={title} className={`p-4 rounded-xl shadow-md bg-gradient-to-tr from-${color}-100 to-${color}-200`}>
                     <div className="flex items-center gap-3">
@@ -894,4 +899,4 @@ function ViewTimeTable() {
   );
 }
 
-export default ViewTimeTable;
+export default ViewCalendar;

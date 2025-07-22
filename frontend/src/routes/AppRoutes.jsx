@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import Dashboard from "../pages/Dashboard";
 import CreateTable from "../pages/CreateTable";
-import ViewTable from "../pages/ViewTimeTable";
+import ViewTable from "../pages/ViewCalendar";
 import Subjects from "../pages/ManageSubjects";
 import Rooms from "../pages/ManageRooms";
 import PrivateRoute from "../components/PrivateRoute";
@@ -10,12 +10,13 @@ import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../components/LoadingScreen";
 import AdminDashboard from "../pages/logPage/AdminDashboard";
 import FacultyDashboard from "../pages/logPage/FacultyDashboard";
-import UpdateTimeTable from "../pages/ViewTimeTable";
+import UpdateTimeTable from "../pages/ViewCalendar";
 import ManageCourses from "../pages/ManageCourses";
 import ManageFaculty from "../pages/ManageFaculty";
 import ManageBatches from "../pages/ManageBatches";
 import Attendence from "../pages/MarkAttendance";
 import ClassTimeTable from "../pages/ClassTimeTable";
+import ViewCalendar from "../pages/ViewCalendar";
 
 
 const AppRoutes = () => {
@@ -59,10 +60,10 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/view-timetable"
+        path="/view-calendar"
         element={
           //<PrivateRoute requiredRoles={["Admin", "Faculty"]}>
-            <ViewTable />
+            <ViewCalendar />
           //</PrivateRoute>
         }
       />
