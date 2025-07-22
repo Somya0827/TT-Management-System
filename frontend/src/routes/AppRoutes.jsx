@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import Dashboard from "../pages/Dashboard";
-import CreateTable from "../pages/CreateTable";
+import CreateTable from "../pages/CreateTimeTable";
 import ViewTable from "../pages/ViewCalendar";
 import Subjects from "../pages/ManageSubjects";
 import Rooms from "../pages/ManageRooms";
@@ -18,6 +18,7 @@ import Attendence from "../pages/MarkAttendance";
 import ClassTimeTable from "../pages/ViewTimeTable";
 import ViewCalendar from "../pages/ViewCalendar";
 import ViewTimeTable from "../pages/ViewTimeTable";
+import CreateTimeTable from "../pages/CreateTimeTable";
 
 
 const AppRoutes = () => {
@@ -48,7 +49,7 @@ const AppRoutes = () => {
         path="/create-timetable"
         element={
           //<PrivateRoute requiredRoles={["Admin"]}>
-            <CreateTable />
+            <CreateTimeTable />
           //</PrivateRoute>
         }
       />

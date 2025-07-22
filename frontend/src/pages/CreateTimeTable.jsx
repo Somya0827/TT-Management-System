@@ -60,7 +60,7 @@ const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
   return groupedData;
 };
 
-const CreateTable = () => {
+const CreateTimeTable = () => {
   const [gridData, setGridData] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
   const [dialogData, setDialogData] = useState({ subject: "", code: "", faculty: "", room: "" });
@@ -127,17 +127,7 @@ const CreateTable = () => {
     fetchAllData();
   }, []);
 
-  // Adding a function to debug the current state
-  const debugCurrentState = () => {
-    console.log('Current State Debug:', {
-      batchDetails,
-      selectedBatch: batches.find(batch => batch.Year === batchDetails.batch),
-      selectedCourse: courses.find(course => course.Name === batchDetails.course),
-      semesterNumber: romanToInteger(batchDetails.semester),
-      gridDataKeys: Object.keys(gridData),
-      timetableState
-    });
-  };
+  // Debug function removed for production
 
   useEffect(() => {
     if (allDetailsSelected() &&
@@ -292,13 +282,17 @@ const CreateTable = () => {
     setIsLoading(true);
     try {
       const [year, section] = batchDetails.batch.split('-');
-      const selectedBatch = batches.find(batch =>
-        batch.Year === parseInt(year) && batch.Section === section
-      );
       const selectedCourse = courses.find(course => course.Name === batchDetails.course);
+      
+      // Find batch by year, section AND course ID
+      const selectedBatch = batches.find(batch =>
+        batch.Year === parseInt(year) && 
+        batch.Section === section &&
+        batch.CourseID === selectedCourse?.ID
+      );
 
       if (!selectedBatch || !selectedCourse) {
-        console.log('Batch or course not found');
+        // Batch or course not found
         return;
       }
 
@@ -318,7 +312,6 @@ const CreateTable = () => {
 
       if (response.ok) {
         const filteredLectures = await response.json();
-        console.log('Filtered lectures from query API:', filteredLectures);
 
         if (filteredLectures && filteredLectures.length > 0) {
           const reconstructedGridData = {};
@@ -403,10 +396,12 @@ const CreateTable = () => {
     setIsSaving(true);
     try {
       const [year, section] = batchDetails.batch.split('-');
-      const selectedBatch = batches.find(batch =>
-        batch.Year === parseInt(year) && batch.Section === section
-      );
       const selectedCourse = courses.find(course => course.Name === batchDetails.course);
+      const selectedBatch = batches.find(batch =>
+        batch.Year === parseInt(year) && 
+        batch.Section === section &&
+        batch.CourseID === selectedCourse?.ID
+      );
 
       if (!selectedBatch || !selectedCourse) {
         throw new Error('Selected batch or course not found');
@@ -451,19 +446,39 @@ const CreateTable = () => {
 
           if (!subject || !faculty || !room) return null;
 
+          // CRITICAL FIX: Only treat as existing lecture if it belongs to current batch
+          let lectureID = null;
+          let isValidExistingLecture = false;
+          
+          if (entry.id) {
+            // Check if this lecture ID exists in the current batch's existing lectures
+            const existingLecture = existingLectures.find(el => el.ID === entry.id);
+            if (existingLecture && existingLecture.BatchID === selectedBatch.ID) {
+              // This is a valid existing lecture for this batch
+              lectureID = entry.id;
+              isValidExistingLecture = true;
+            } else if (existingLecture) {
+              // This lecture belongs to a different batch - treat as new lecture
+              console.warn(`Lecture ID ${entry.id} belongs to different batch (${existingLecture.BatchID} vs ${selectedBatch.ID}) - creating new lecture`);
+              lectureID = null;
+              isValidExistingLecture = false;
+            }
+          }
+
           return {
             key,
             data: {
-              ID: entry.id, // Always use existing ID if available
+              ID: lectureID, // Only use ID if it's a valid existing lecture for this batch
               DayOfWeek: day,
               StartTime: startTime,
               EndTime: endTime,
               SubjectID: subject.ID,
               FacultyID: faculty.ID,
-              BatchID: selectedBatch.ID,
+              BatchID: selectedBatch.ID, // Always use current batch ID
               Semester: semesterNumber,
               RoomID: room.ID
-            }
+            },
+            isValidExisting: isValidExistingLecture
           };
         })
         .filter(lecture => lecture !== null);
@@ -472,10 +487,11 @@ const CreateTable = () => {
       const lecturesToUpdate = [];
       const lecturesToCreate = [];
 
-      lecturesToProcess.forEach(({ key, data }) => {
+      lecturesToProcess.forEach(({ key, data, isValidExisting }) => {
         const existingLecture = existingLecturesMap.get(key);
 
-        if (existingLecture) {
+        if (existingLecture && existingLecture.BatchID === selectedBatch.ID) {
+          // This is a lecture that exists in the same time slot for the current batch
           // Check if any fields have changed (including times)
           const hasChanges = (
             existingLecture.SubjectID !== data.SubjectID ||
@@ -488,15 +504,16 @@ const CreateTable = () => {
           if (hasChanges) {
             lecturesToUpdate.push({
               ...data,
-              ID: existingLecture.ID // Ensure we use the existing ID
+              ID: existingLecture.ID // Use the existing lecture ID
             });
           }
-        } else if (data.ID) {
-          // This is an existing lecture that had its timeslot changed
+        } else if (data.ID && isValidExisting) {
+          // This is an existing lecture that had its timeslot changed within the same batch
           lecturesToUpdate.push(data);
         } else {
-          // New lecture
-          lecturesToCreate.push(data);
+          // This is a new lecture (no ID or ID belongs to different batch)
+          const { ID, ...lectureDataWithoutId } = data; // Remove ID for new lectures
+          lecturesToCreate.push(lectureDataWithoutId);
         }
       });
 
@@ -510,10 +527,6 @@ const CreateTable = () => {
 
         return !currentKeys.has(key) && !wasUpdated;
       });
-
-      console.log('Lectures to create:', lecturesToCreate.length);
-      console.log('Lectures to update:', lecturesToUpdate.length);
-      console.log('Lectures to delete:', lecturesToDelete.length);
 
       // Execute updates first
       if (lecturesToUpdate.length > 0) {
@@ -640,7 +653,10 @@ const CreateTable = () => {
   const getFilteredBatches = () => {
     if (!batchDetails.course) return batches;
     const selectedCourse = courses.find(course => course.Name === batchDetails.course);
-    if (!selectedCourse) return [];
+    
+    if (!selectedCourse) {
+      return [];
+    }
 
     return batches
       .filter(batch => batch.CourseID === selectedCourse.ID)
@@ -837,8 +853,6 @@ const CreateTable = () => {
 
   const handleGenerateTimetable = () => {
     if (allDetailsSelected()) {
-      console.log('Generating timetable with:', batchDetails);
-      debugCurrentState();
       setShowTimetable(true);
       setIsLocked(true);
     }
@@ -1634,4 +1648,4 @@ const CreateTable = () => {
   );
 }
 
-export default CreateTable
+export default CreateTimeTable
