@@ -59,8 +59,10 @@ const ManageFaculty = () => {
             }
 
             const data = await response.json();
-            setFaculties(data);
-            setFilteredFaculties(data);
+            // Sort faculty names alphabetically
+            const sortedData = data.sort((a, b) => a.Name.localeCompare(b.Name));
+            setFaculties(sortedData);
+            setFilteredFaculties(sortedData);
         } catch (err) {
             console.error('Error fetching faculties:', err);
             setError('Failed to load faculties. Please try again.');
@@ -77,7 +79,9 @@ const ManageFaculty = () => {
         const results = faculties.filter(faculty =>
             faculty.Name.toLowerCase().includes(searchTerm.toLowerCase())
         );
-        setFilteredFaculties(results);
+        // Sort filtered results alphabetically
+        const sortedResults = results.sort((a, b) => a.Name.localeCompare(b.Name));
+        setFilteredFaculties(sortedResults);
     }, [searchTerm, faculties]);
 
     const handleSaveFaculty = async () => {
@@ -176,7 +180,7 @@ const ManageFaculty = () => {
             }
 
             setFaculties(faculties.filter(faculty => faculty.ID !== id));
-            setFilteredFaculties(filteredFaculties.filter(faculty => faculty.ID !== id));
+            setFilteredFaculties(filteredFaculties.filter(faculty => faculty.ID !== id).sort((a, b) => a.Name.localeCompare(b.Name)));
             toast.success("Faculty Deleted Successfully");
         } catch (err) {
             console.error('Error deleting faculty:', err);
