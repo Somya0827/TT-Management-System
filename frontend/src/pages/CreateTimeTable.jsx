@@ -675,6 +675,17 @@ const CreateTimeTable = () => {
     return semesters.filter(semester => true);
   };
 
+  const getFilteredSubjects = () => {
+    if (!batchDetails.course) return subjects;
+    const selectedCourse = courses.find(course => course.Name === batchDetails.course);
+    
+    if (!selectedCourse) {
+      return [];
+    }
+
+    return subjects.filter(subject => subject.CourseID === selectedCourse.ID);
+  };
+
   // Calculate current semester based on batch year and current date
   const calculateCurrentSemester = (batchYear) => {
     const currentDate = new Date();
@@ -777,8 +788,22 @@ const CreateTimeTable = () => {
     const existingData = gridData[`${day}-${time}`];
     
     if (existingData) {
-      // If editing existing lecture, use the current data
-      setDialogData(existingData);
+      // If editing existing lecture, validate that the subject belongs to the current course
+      const filteredSubjects = getFilteredSubjects();
+      const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === existingData.subject);
+      
+      if (isSubjectValidForCourse) {
+        // Use the current data if subject is valid for the course
+        setDialogData(existingData);
+      } else {
+        // Clear subject data if it doesn't belong to current course, but keep room
+        setDialogData({ 
+          subject: "", 
+          code: "", 
+          faculty: "", 
+          room: existingData.room || lastUsedRoom 
+        });
+      }
     } else {
       // If adding new lecture, pre-select last used room
       setDialogData({ 
@@ -855,7 +880,8 @@ const CreateTimeTable = () => {
 
   const handleDialogInputChange = (field, value) => {
     if (field === "subject") {
-      const selectedSubject = subjects.find((sub) => sub.Name === value);
+      const filteredSubjects = getFilteredSubjects();
+      const selectedSubject = filteredSubjects.find((sub) => sub.Name === value);
       setDialogData({
         subject: selectedSubject?.Name || "",
         code: selectedSubject?.Code || "",
@@ -1506,19 +1532,26 @@ const CreateTimeTable = () => {
               <Select
                 value={dialogData.subject}
                 onValueChange={(value) => handleDialogInputChange("subject", value)}
+                disabled={!batchDetails.course}
               >
                 <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                  <SelectValue placeholder="Select subject" />
+                  <SelectValue placeholder={!batchDetails.course ? "Select course first" : "Select subject"} />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-2 shadow-lg">
-                  {subjects.map((subject) => (
-                    <SelectItem key={subject.ID} value={subject.Name} className="rounded-lg">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{subject.Name}</span>
-                        <span className="text-xs text-gray-500">{subject.Code}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {getFilteredSubjects().length === 0 && batchDetails.course ? (
+                    <div className="px-4 py-2 text-sm text-gray-500 text-center">
+                      No subjects available for {batchDetails.course}
+                    </div>
+                  ) : (
+                    getFilteredSubjects().map((subject) => (
+                      <SelectItem key={subject.ID} value={subject.Name} className="rounded-lg">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{subject.Name}</span>
+                          <span className="text-xs text-gray-500">{subject.Code}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
