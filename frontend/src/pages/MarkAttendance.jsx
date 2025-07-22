@@ -171,7 +171,7 @@ const StatusModal = React.memo(({ session, onClose, onUpdate }) => {
   );
 });
 
-function MarkAttendance() {
+function MarkLectures() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [sessions, setSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
@@ -356,7 +356,7 @@ function MarkAttendance() {
     setFilteredSessions(filtered);
   };
 
-  const markAttendance = async (sessionId, newStatus) => {
+  const markLectures = async (sessionId, newStatus) => {
     try {
       const response = await fetch(`${API_BASE_URL}/session/${sessionId}`, {
         method: 'PUT',
@@ -386,8 +386,8 @@ function MarkAttendance() {
       setShowStatusModal(false);
       setSelectedSessionForModal(null);
     } catch (err) {
-      console.error("Error marking attendance:", err);
-      setError(`Failed to mark attendance: ${err.message}`);
+      console.error("Error marking lectures:", err);
+      setError(`Failed to mark lectures: ${err.message}`);
     }
   };
 
@@ -438,7 +438,7 @@ function MarkAttendance() {
     return (
       <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100">
         <Spinner />
-        <p className="mt-4 text-lg text-gray-600">Loading Mark Attendance...</p>
+        <p className="mt-4 text-lg text-gray-600">Loading Mark Lectures...</p>
       </div>
     );
   }
@@ -451,7 +451,7 @@ function MarkAttendance() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center gap-2 sm:gap-4">
               <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800 flex items-center gap-2 sm:gap-3">
-                Mark Attendance
+                Mark Lectures
               </h1>
             </div>
 
@@ -745,7 +745,7 @@ function MarkAttendance() {
         <StatusModal
           session={selectedSessionForModal}
           onClose={closeStatusModal}
-          onUpdate={markAttendance}
+          onUpdate={markLectures}
         />
       )}
 
@@ -766,4 +766,4 @@ function MarkAttendance() {
   );
 }
 
-export default MarkAttendance;
+export default MarkLectures;
