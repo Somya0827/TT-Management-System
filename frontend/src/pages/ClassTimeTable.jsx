@@ -115,11 +115,11 @@ const ClassTimeTable = () => {
   // Convert lectures to grid data format and collect all unique time slots
   const convertLecturesToGridData = (lectures) => {
     const grid = {};
-    const uniqueTimeSlots = new Set(academicData.timeSlots);
+    const uniqueTimeSlots = new Set(); // Start with empty set to only include time slots with lectures
 
     lectures.forEach(lecture => {
       const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
-      uniqueTimeSlots.add(timeSlot);
+      uniqueTimeSlots.add(timeSlot); // Only add time slots that have lectures
 
       const key = `${lecture.DayOfWeek}-${timeSlot}`;
       grid[key] = {
@@ -133,7 +133,7 @@ const ClassTimeTable = () => {
       };
     });
 
-    // Convert Set to array and sort time slots
+    // Convert Set to array and sort time slots - only includes slots with lectures
     const sortedTimeSlots = sortTimeSlots([...uniqueTimeSlots]);
     setAllTimeSlots(sortedTimeSlots);
 
@@ -701,6 +701,11 @@ const ClassTimeTable = () => {
                   // Get all lectures for this day
                   const dayLectures = lectures.filter(lec => lec.DayOfWeek === day);
 
+                  // Only show days that have lectures
+                  if (dayLectures.length === 0) {
+                    return null;
+                  }
+
                   return (
                     <div key={day} className="bg-gray-50 rounded-xl p-4">
                       <h3 className="font-bold text-indigo-700 mb-3 text-lg">{day}</h3>
@@ -734,7 +739,7 @@ const ClassTimeTable = () => {
                                       {facultyName}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {roomName}
+                                      Room: {roomName}
                                     </div>
                                   </div>
                                 </div>
@@ -769,17 +774,16 @@ const ClassTimeTable = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map((day, dayIndex) => {
-                      const groupedLectures = groupConsecutiveTimeSlots(lectures, [day], allTimeSlots);
+                    {days
+                      .filter(day => lectures.some(lec => lec.DayOfWeek === day)) // Only include days with lectures
+                      .map((day, dayIndex) => {
+                        const groupedLectures = groupConsecutiveTimeSlots(lectures, [day], allTimeSlots);
 
-                      // Also get all lectures for this day that might not be in predefined slots
-                      const allDayLectures = lectures.filter(lec => lec.DayOfWeek === day);
-
-                      return (
-                        <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
-                            {day}
-                          </td>
+                        return (
+                          <tr key={day} className={dayIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
+                              {day}
+                            </td>
                           {allTimeSlots.map((time, timeIndex) => {
                             const cellKey = `${day}-${time}`;
                             const groupedLecture = groupedLectures[cellKey];
@@ -815,7 +819,7 @@ const ClassTimeTable = () => {
                                       {groupedLecture.faculty}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {groupedLecture.room}
+                                      Room: {groupedLecture.room}
                                     </div>
                                     {colSpan > 1 && (
                                       <div className="text-xs text-gray-400 mt-1">
@@ -824,6 +828,7 @@ const ClassTimeTable = () => {
                                     )}
                                   </div>
                                 ) : (
+                                  // This case should rarely occur now since we only show time slots with lectures
                                   <div className="text-gray-400 text-sm font-medium">
                                     No class
                                   </div>

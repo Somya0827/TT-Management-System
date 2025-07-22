@@ -63,7 +63,7 @@ const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
 const CreateTable = () => {
   const [gridData, setGridData] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
-  const [dialogData, setDialogData] = useState({ subject: "", code: "", faculty: "" });
+  const [dialogData, setDialogData] = useState({ subject: "", code: "", faculty: "", room: "" });
   const [showTimetable, setShowTimetable] = useState(false);
   const [batchDetails, setBatchDetails] = useState({
     course: "",
@@ -109,6 +109,7 @@ const CreateTable = () => {
   const [subjects, setSubjects] = useState([]);
   const [faculties, setFaculties] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [lastUsedRoom, setLastUsedRoom] = useState("");
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
@@ -322,6 +323,7 @@ const CreateTable = () => {
         if (filteredLectures && filteredLectures.length > 0) {
           const reconstructedGridData = {};
           const timeSlotsSet = new Set();
+          let mostRecentRoom = "";
 
           filteredLectures.forEach(lecture => {
             const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
@@ -335,8 +337,18 @@ const CreateTable = () => {
               room: lecture.Room?.Name || ''
             };
 
+            // Track the most recent room for pre-selection
+            if (lecture.Room?.Name) {
+              mostRecentRoom = lecture.Room.Name;
+            }
+
             timeSlotsSet.add(timeSlot);
           });
+
+          // Set the last used room from existing lectures
+          if (mostRecentRoom) {
+            setLastUsedRoom(mostRecentRoom);
+          }
 
           // Include default time slots if they don't exist
           academicData.timeSlots.forEach(slot => timeSlotsSet.add(slot));
@@ -372,6 +384,7 @@ const CreateTable = () => {
     const defaultTimeSlots = [...academicData.timeSlots];
     setGridData({});
     setTimeSlots(defaultTimeSlots);
+    setLastUsedRoom(""); // Clear last used room when resetting
     setTimetableState({
       id: null,
       gridData: {},
@@ -436,7 +449,7 @@ const CreateTable = () => {
           const faculty = faculties.find(fac => fac.Name === entry.faculty);
           const room = rooms.find(r => r.Name === entry.room);
 
-          if (!subject || !faculty) return null;
+          if (!subject || !faculty || !room) return null;
 
           return {
             key,
@@ -449,7 +462,7 @@ const CreateTable = () => {
               FacultyID: faculty.ID,
               BatchID: selectedBatch.ID,
               Semester: semesterNumber,
-              RoomID: room?.ID || 1
+              RoomID: room.ID
             }
           };
         })
@@ -711,7 +724,20 @@ const CreateTable = () => {
 
   const handleCellClick = (day, time) => {
     setSelectedCell({ day, time });
-    setDialogData(gridData[`${day}-${time}`] || { subject: "", code: "", faculty: "" });
+    const existingData = gridData[`${day}-${time}`];
+    
+    if (existingData) {
+      // If editing existing lecture, use the current data
+      setDialogData(existingData);
+    } else {
+      // If adding new lecture, pre-select last used room
+      setDialogData({ 
+        subject: "", 
+        code: "", 
+        faculty: "", 
+        room: lastUsedRoom 
+      });
+    }
   };
 
   const romanToInteger = (roman) => {
@@ -749,8 +775,10 @@ const CreateTable = () => {
     const key = `${selectedCell.day}-${selectedCell.time}`;
     const newGridData = { ...gridData };
 
-    if (dialogData.subject && dialogData.faculty) {
+    if (dialogData.subject && dialogData.faculty && dialogData.room) {
       newGridData[key] = { ...dialogData };
+      // Update last used room when saving a lecture
+      setLastUsedRoom(dialogData.room);
     } else {
       delete newGridData[key];
     }
@@ -781,7 +809,8 @@ const CreateTable = () => {
       setDialogData({
         subject: selectedSubject?.Name || "",
         code: selectedSubject?.Code || "",
-        faculty: ""
+        faculty: "",
+        room: lastUsedRoom // Keep the last used room when changing subject
       });
     } else {
       setDialogData({ ...dialogData, [field]: value });
@@ -795,6 +824,7 @@ const CreateTable = () => {
 
       setGridData(defaultGridData);
       setTimeSlots(defaultTimeSlots);
+      setLastUsedRoom(""); // Clear last used room when clearing timetable
       setTimetableState({
         id: null,
         gridData: defaultGridData,
@@ -1238,9 +1268,14 @@ const CreateTable = () => {
                                     <div className="text-xs text-gray-600 mb-1">
                                       {cellData.code}
                                     </div>
-                                    <div className="text-xs text-gray-500">
+                                    <div className="text-xs text-gray-500 mb-1">
                                       {cellData.faculty}
                                     </div>
+                                    {cellData.room && (
+                                      <div className="text-xs text-gray-500">
+                                        Room: {cellData.room}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="text-gray-400 text-sm">Tap to add class</div>
@@ -1357,6 +1392,11 @@ const CreateTable = () => {
                                     <div className="text-xs text-gray-500">
                                       {lecture.faculty}
                                     </div>
+                                    {lecture.room && (
+                                      <div className="text-xs text-gray-400">
+                                        {lecture.room}
+                                      </div>
+                                    )}
                                     {colSpan > 1 && (
                                       <div className="text-xs text-gray-400 mt-1">
                                         {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
@@ -1449,6 +1489,30 @@ const CreateTable = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">Room</label>
+              <Select
+                value={dialogData.room}
+                onValueChange={(value) => handleDialogInputChange("room", value)}
+              >
+                <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                  <SelectValue placeholder="Select room" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-2 shadow-lg">
+                  {rooms.map((room) => (
+                    <SelectItem key={room.ID} value={room.Name} className="rounded-lg">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{room.Name}</span>
+                        {room.Capacity && (
+                          <span className="text-xs text-gray-500">Capacity: {room.Capacity}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
@@ -1473,7 +1537,7 @@ const CreateTable = () => {
               <Button
                 className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-medium"
                 onClick={handleSaveEntry}
-                disabled={!dialogData.subject || !dialogData.faculty}
+                disabled={!dialogData.subject || !dialogData.faculty || !dialogData.room}
               >
                 Save Class
               </Button>
