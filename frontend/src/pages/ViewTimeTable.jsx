@@ -125,7 +125,7 @@ const ViewTimeTable = () => {
       uniqueTimeSlots.add(timeSlot); // Only add time slots that have lectures
 
       const key = `${lecture.DayOfWeek}-${timeSlot}`;
-      grid[key] = {
+      const lectureData = {
         id: lecture.ID,
         subject: subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A',
         code: subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A',
@@ -134,6 +134,17 @@ const ViewTimeTable = () => {
         startTime: lecture.StartTime,
         endTime: lecture.EndTime
       };
+
+      // Handle multiple lectures in the same timeslot
+      if (grid[key]) {
+        // Convert to array if not already
+        if (!Array.isArray(grid[key])) {
+          grid[key] = [grid[key]];
+        }
+        grid[key].push(lectureData);
+      } else {
+        grid[key] = lectureData;
+      }
     });
 
     // Convert Set to array and sort time slots - only includes slots with lectures
@@ -842,21 +853,35 @@ const ViewTimeTable = () => {
                     return null;
                   }
 
+                  // Group lectures by timeslot for this day
+                  const lecturesByTimeSlot = {};
+                  dayLectures.forEach(lecture => {
+                    const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
+                    if (!lecturesByTimeSlot[timeSlot]) {
+                      lecturesByTimeSlot[timeSlot] = [];
+                    }
+                    lecturesByTimeSlot[timeSlot].push({
+                      id: lecture.ID,
+                      subject: subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A',
+                      code: subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A',
+                      faculty: faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A',
+                      room: rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A',
+                    });
+                  });
+
                   return (
                     <div key={day} className="bg-gray-50 rounded-xl p-4">
                       <h3 className="font-bold text-indigo-700 mb-3 text-lg">{day}</h3>
                       <div className="space-y-2">
-                        {/* Show all lectures for this day, not just predefined time slots */}
-                        {dayLectures.map((lecture) => {
-                          const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
-                          const subjectName = subjects.find(sub => sub.ID === lecture.SubjectID)?.Name || 'N/A';
-                          const facultyName = faculties.find(fac => fac.ID === lecture.FacultyID)?.Name || 'N/A';
-                          const roomName = rooms.find(room => room.ID === lecture.RoomID)?.Name || 'N/A';
-                          const subjectCode = subjects.find(sub => sub.ID === lecture.SubjectID)?.Code || 'N/A';
-
-                          return (
+                        {Object.entries(lecturesByTimeSlot)
+                          .sort(([timeA], [timeB]) => {
+                            const [startA] = timeA.split('-');
+                            const [startB] = timeB.split('-');
+                            return parseTimeToMinutes(startA) - parseTimeToMinutes(startB);
+                          })
+                          .map(([timeSlot, lectures]) => (
                             <div
-                              key={`${day}-${lecture.ID}`}
+                              key={`${day}-${timeSlot}`}
                               className="bg-white rounded-lg p-3 border-2 border-gray-200"
                             >
                               <div className="flex justify-between items-start">
@@ -864,25 +889,44 @@ const ViewTimeTable = () => {
                                   <div className="text-sm font-semibold text-gray-600 mb-1">
                                     {timeSlot}
                                   </div>
-                                  <div>
-                                    <div className="font-semibold text-indigo-700 text-sm mb-1">
-                                      {subjectName}
+                                  {lectures.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {lectures.map((lecture, index) => (
+                                        <div key={index}>
+                                          {index > 0 && (
+                                            <div className="flex items-center my-2">
+                                              <div className="flex-1 h-px bg-blue-300"></div>
+                                              <div className="px-2 text-xs text-blue-600 font-medium">•</div>
+                                              <div className="flex-1 h-px bg-blue-300"></div>
+                                            </div>
+                                          )}
+                                          <div className={`${lectures.length > 1 ? 'border-l-2 border-indigo-300 pl-2 text-center' : ''}`}>
+                                            <div className="font-semibold text-indigo-700 text-sm mb-1">
+                                              {lecture.subject}
+                                              {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
+                                            </div>
+                                            <div className="text-xs text-gray-600 mb-1">
+                                              {lecture.code}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mb-1">
+                                              {lecture.faculty}
+                                            </div>
+                                            {lecture.room && (
+                                              <div className="text-xs text-gray-500">
+                                                Room: {lecture.room}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                    <div className="text-xs text-gray-600 mb-1">
-                                      {subjectCode}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {facultyName}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      Room: {roomName}
-                                    </div>
-                                  </div>
+                                  ) : (
+                                    <div className="text-gray-400 text-sm">No class</div>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
+                          ))}
                       </div>
                     </div>
                   );
@@ -922,6 +966,8 @@ const ViewTimeTable = () => {
                             </td>
                           {allTimeSlots.map((time, timeIndex) => {
                             const cellKey = `${day}-${time}`;
+                            const cellData = gridData[cellKey];
+                            const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
                             const groupedLecture = groupedLectures[cellKey];
 
                             // Skip rendering if this is part of a group but not the first in the group
@@ -939,24 +985,41 @@ const ViewTimeTable = () => {
                                 key={cellKey}
                                 className={clsx(
                                   "border-r border-gray-200 p-3 text-center h-24 min-w-[140px]",
-                                  groupedLecture?.isGrouped ? "bg-blue-50" : ""
+                                  colSpan > 1 ? "bg-blue-50" : "",
+                                  lectures.length > 1 ? "bg-gradient-to-br from-indigo-50 to-purple-50" : ""
                                 )}
                                 colSpan={colSpan}
                               >
-                                {groupedLecture ? (
-                                  <div className="space-y-1">
-                                    <div className="font-semibold text-indigo-700 text-sm leading-tight">
-                                      {groupedLecture.subject}
-                                    </div>
-                                    <div className="text-xs text-gray-600 font-medium">
-                                      {groupedLecture.code}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {groupedLecture.faculty}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      Room: {groupedLecture.room}
-                                    </div>
+                                {lectures.length > 0 ? (
+                                  <div>
+                                    {lectures.map((lecture, index) => (
+                                      <div key={index}>
+                                        {index > 0 && (
+                                          <div className="flex items-center my-1">
+                                            <div className="flex-1 h-px bg-blue-400"></div>
+                                            <div className="px-1 text-xs text-blue-600 font-bold">•</div>
+                                            <div className="flex-1 h-px bg-blue-400"></div>
+                                          </div>
+                                        )}
+                                        <div className={`${lectures.length > 1 ? 'text-center' : ''}`}>
+                                          <div className="font-semibold text-indigo-700 text-sm leading-tight">
+                                            {lecture.subject}
+                                            {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
+                                          </div>
+                                          <div className="text-xs text-gray-600 font-medium">
+                                            {lecture.code}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {lecture.faculty}
+                                          </div>
+                                          {lecture.room && (
+                                            <div className="text-xs text-gray-400">
+                                              {lecture.room}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
                                     {colSpan > 1 && (
                                       <div className="text-xs text-gray-400 mt-1">
                                         {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}

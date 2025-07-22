@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Save, RefreshCw, Trash } from "lucide-react";
+import { Plus, Edit, Trash2, Save, RefreshCw, Trash, X, Users } from "lucide-react";
 import academicData from "../assets/academicData.json";
 
 const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
@@ -27,7 +27,11 @@ const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
 
     timeSlots.forEach((time, timeIndex) => {
       const key = `${day}-${time}`;
-      const lecture = gridData[key];
+      const cellData = gridData[key];
+      
+      // Handle both array and single object formats
+      const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
+      const lecture = lectures.length > 0 ? lectures[0] : null; // Use first lecture for grouping
 
       if (lecture) {
         const groupKey = `${day}-${lecture.subject}-${lecture.faculty}`;
@@ -65,6 +69,8 @@ const CreateTimeTable = () => {
   const [selectedCell, setSelectedCell] = useState(null);
   const [dialogData, setDialogData] = useState({ subject: "", code: "", faculty: "", room: "" });
   const [showTimetable, setShowTimetable] = useState(false);
+  const [selectedLectureIndex, setSelectedLectureIndex] = useState(0);
+  const [editingLectureIndex, setEditingLectureIndex] = useState(-1);
   const [batchDetails, setBatchDetails] = useState({
     course: "",
     batch: "",
@@ -325,13 +331,19 @@ const CreateTimeTable = () => {
             const timeSlot = `${lecture.StartTime}-${lecture.EndTime}`;
             const key = `${lecture.DayOfWeek}-${timeSlot}`;
 
-            reconstructedGridData[key] = {
+            const lectureData = {
               id: lecture.ID,
               subject: lecture.Subject?.Name || '',
               code: lecture.Subject?.Code || '',
               faculty: lecture.Faculty?.Name || '',
               room: lecture.Room?.Name || ''
             };
+
+            // Initialize array if it doesn't exist, then push the lecture
+            if (!reconstructedGridData[key]) {
+              reconstructedGridData[key] = [];
+            }
+            reconstructedGridData[key].push(lectureData);
 
             // Track the most recent room for pre-selection
             if (lecture.Room?.Name) {
@@ -433,57 +445,77 @@ const CreateTimeTable = () => {
 
       const existingLectures = await getResponse.json();
 
-      // Create a map of existing lectures by their composite key
-      const existingLecturesMap = new Map();
+      // Create a map of existing lectures by their ID for easier lookup
+      const existingLecturesById = new Map();
+      existingLectures.forEach(lecture => {
+        existingLecturesById.set(lecture.ID, lecture);
+      });
+
+      // Also create a map by time slot to check for existing lectures in same time slot
+      const existingLecturesByTimeSlot = new Map();
       existingLectures.forEach(lecture => {
         const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
-        existingLecturesMap.set(key, lecture);
+        if (!existingLecturesByTimeSlot.has(key)) {
+          existingLecturesByTimeSlot.set(key, []);
+        }
+        existingLecturesByTimeSlot.get(key).push(lecture);
       });
 
       // Process current grid data
+      console.log('Current timetableState.gridData:', timetableState.gridData);
+      
       const lecturesToProcess = Object.entries(timetableState.gridData)
-        .map(([key, entry]) => {
-          const [day, startTime, endTime] = key.split('-');
-          const subject = subjects.find(sub => sub.Name === entry.subject);
-          const faculty = faculties.find(fac => fac.Name === entry.faculty);
-          const room = rooms.find(r => r.Name === entry.room);
-
-          if (!subject || !faculty || !room) return null;
-
-          // CRITICAL FIX: Only treat as existing lecture if it belongs to current batch
-          let lectureID = null;
-          let isValidExistingLecture = false;
+        .flatMap(([key, lectures]) => {
+          const keyParts = key.split('-');
+          const day = keyParts[0];
+          const timeSlot = keyParts.slice(1).join('-'); // Rejoin in case time has multiple dashes
+          const [startTime, endTime] = timeSlot.split('-');
           
-          if (entry.id) {
-            // Check if this lecture ID exists in the current batch's existing lectures
-            const existingLecture = existingLectures.find(el => el.ID === entry.id);
-            if (existingLecture && existingLecture.BatchID === selectedBatch.ID) {
-              // This is a valid existing lecture for this batch
-              lectureID = entry.id;
-              isValidExistingLecture = true;
-            } else if (existingLecture) {
-              // This lecture belongs to a different batch - treat as new lecture
-              console.warn(`Lecture ID ${entry.id} belongs to different batch (${existingLecture.BatchID} vs ${selectedBatch.ID}) - creating new lecture`);
-              lectureID = null;
-              isValidExistingLecture = false;
-            }
-          }
+          // Handle both array and single object formats for backward compatibility
+          const lectureArray = Array.isArray(lectures) ? lectures : [lectures];
+          
+          return lectureArray.map(entry => {
+            const subject = subjects.find(sub => sub.Name === entry.subject);
+            const faculty = faculties.find(fac => fac.Name === entry.faculty);
+            const room = rooms.find(r => r.Name === entry.room);
 
-          return {
-            key,
-            data: {
-              ID: lectureID, // Only use ID if it's a valid existing lecture for this batch
-              DayOfWeek: day,
-              StartTime: startTime,
-              EndTime: endTime,
-              SubjectID: subject.ID,
-              FacultyID: faculty.ID,
-              BatchID: selectedBatch.ID, // Always use current batch ID
-              Semester: semesterNumber,
-              RoomID: room.ID
-            },
-            isValidExisting: isValidExistingLecture
-          };
+            if (!subject || !faculty || !room) return null;
+
+            // CRITICAL FIX: Only treat as existing lecture if it belongs to current batch
+            let lectureID = null;
+            let isValidExistingLecture = false;
+            
+            if (entry.id) {
+              // Check if this lecture ID exists in the current batch's existing lectures
+              const existingLecture = existingLectures.find(el => el.ID === entry.id);
+              if (existingLecture && existingLecture.BatchID === selectedBatch.ID) {
+                // This is a valid existing lecture for this batch
+                lectureID = entry.id;
+                isValidExistingLecture = true;
+              } else if (existingLecture) {
+                // This lecture belongs to a different batch - treat as new lecture
+                console.warn(`Lecture ID ${entry.id} belongs to different batch (${existingLecture.BatchID} vs ${selectedBatch.ID}) - creating new lecture`);
+                lectureID = null;
+                isValidExistingLecture = false;
+              }
+            }
+
+            return {
+              key: `${day}-${startTime}-${endTime}`, // Use the same format as existingLecturesMap
+              data: {
+                ID: lectureID, // Only use ID if it's a valid existing lecture for this batch
+                DayOfWeek: day,
+                StartTime: startTime,
+                EndTime: endTime,
+                SubjectID: subject.ID,
+                FacultyID: faculty.ID,
+                BatchID: selectedBatch.ID, // Always use current batch ID
+                Semester: semesterNumber,
+                RoomID: room.ID
+              },
+              isValidExisting: isValidExistingLecture
+            };
+          });
         })
         .filter(lecture => lecture !== null);
 
@@ -491,45 +523,56 @@ const CreateTimeTable = () => {
       const lecturesToUpdate = [];
       const lecturesToCreate = [];
 
+      console.log('Processing lectures:', lecturesToProcess.length);
+      console.log('Existing lectures:', existingLectures.length);
+
       lecturesToProcess.forEach(({ key, data, isValidExisting }) => {
-        const existingLecture = existingLecturesMap.get(key);
+        if (data.ID && isValidExisting) {
+          // This lecture has a valid existing ID, check if it needs updating
+          const existingLecture = existingLecturesById.get(data.ID);
+          if (existingLecture) {
+            const hasChanges = (
+              existingLecture.SubjectID !== data.SubjectID ||
+              existingLecture.FacultyID !== data.FacultyID ||
+              existingLecture.RoomID !== data.RoomID ||
+              existingLecture.StartTime !== data.StartTime ||
+              existingLecture.EndTime !== data.EndTime
+            );
 
-        if (existingLecture && existingLecture.BatchID === selectedBatch.ID) {
-          // This is a lecture that exists in the same time slot for the current batch
-          // Check if any fields have changed (including times)
-          const hasChanges = (
-            existingLecture.SubjectID !== data.SubjectID ||
-            existingLecture.FacultyID !== data.FacultyID ||
-            existingLecture.RoomID !== data.RoomID ||
-            existingLecture.StartTime !== data.StartTime ||
-            existingLecture.EndTime !== data.EndTime
-          );
-
-          if (hasChanges) {
-            lecturesToUpdate.push({
-              ...data,
-              ID: existingLecture.ID // Use the existing lecture ID
-            });
+            if (hasChanges) {
+              console.log('Updating lecture:', data.ID);
+              lecturesToUpdate.push({
+                ...data,
+                ID: existingLecture.ID
+              });
+            } else {
+              console.log('No changes for lecture:', data.ID);
+            }
           }
-        } else if (data.ID && isValidExisting) {
-          // This is an existing lecture that had its timeslot changed within the same batch
-          lecturesToUpdate.push(data);
         } else {
-          // This is a new lecture (no ID or ID belongs to different batch)
-          const { ID, ...lectureDataWithoutId } = data; // Remove ID for new lectures
+          // This is a new lecture (no valid ID)
+          console.log('Creating new lecture:', data);
+          const { ID, ...lectureDataWithoutId } = data;
           lecturesToCreate.push(lectureDataWithoutId);
         }
       });
 
+      console.log('Lectures to create:', lecturesToCreate.length);
+      console.log('Lectures to update:', lecturesToUpdate.length);
+
       // Find lectures to delete (exist in DB but not in current grid)
-      const currentKeys = new Set(lecturesToProcess.map(l => l.key));
+      const currentLectureIds = new Set(
+        lecturesToProcess
+          .filter(l => l.data.ID && l.isValidExisting)
+          .map(l => l.data.ID)
+      );
+
       const lecturesToDelete = existingLectures.filter(lecture => {
-        const key = `${lecture.DayOfWeek}-${lecture.StartTime}-${lecture.EndTime}`;
-
-        // Don't delete if this lecture was updated (has matching ID in updates)
+        // Don't delete if this lecture was updated or is still present in grid
         const wasUpdated = lecturesToUpdate.some(update => update.ID === lecture.ID);
-
-        return !currentKeys.has(key) && !wasUpdated;
+        const isStillPresent = currentLectureIds.has(lecture.ID);
+        
+        return !wasUpdated && !isStillPresent;
       });
 
       // Execute updates first
@@ -787,22 +830,40 @@ const CreateTimeTable = () => {
     setSelectedCell({ day, time });
     const existingData = gridData[`${day}-${time}`];
     
-    if (existingData) {
-      // If editing existing lecture, validate that the subject belongs to the current course
+    if (existingData && Array.isArray(existingData) && existingData.length > 0) {
+      // If editing existing lectures, show the first one by default
+      const firstLecture = existingData[0];
+      const filteredSubjects = getFilteredSubjects();
+      const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === firstLecture.subject);
+      
+      if (isSubjectValidForCourse) {
+        setDialogData(firstLecture);
+        setEditingLectureIndex(0);
+      } else {
+        setDialogData({ 
+          subject: "", 
+          code: "", 
+          faculty: "", 
+          room: firstLecture.room || lastUsedRoom 
+        });
+        setEditingLectureIndex(-1);
+      }
+    } else if (existingData && !Array.isArray(existingData)) {
+      // Handle backward compatibility with single lecture objects
       const filteredSubjects = getFilteredSubjects();
       const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === existingData.subject);
       
       if (isSubjectValidForCourse) {
-        // Use the current data if subject is valid for the course
         setDialogData(existingData);
+        setEditingLectureIndex(0);
       } else {
-        // Clear subject data if it doesn't belong to current course, but keep room
         setDialogData({ 
           subject: "", 
           code: "", 
           faculty: "", 
           room: existingData.room || lastUsedRoom 
         });
+        setEditingLectureIndex(-1);
       }
     } else {
       // If adding new lecture, pre-select last used room
@@ -812,6 +873,7 @@ const CreateTimeTable = () => {
         faculty: "", 
         room: lastUsedRoom 
       });
+      setEditingLectureIndex(-1);
     }
   };
 
@@ -851,15 +913,39 @@ const CreateTimeTable = () => {
     const newGridData = { ...gridData };
 
     if (dialogData.subject && dialogData.faculty && dialogData.room) {
-      newGridData[key] = { ...dialogData };
+      // Initialize as array if it doesn't exist
+      if (!newGridData[key]) {
+        newGridData[key] = [];
+      } else if (!Array.isArray(newGridData[key])) {
+        // Convert single object to array for backward compatibility
+        newGridData[key] = [newGridData[key]];
+      }
+
+      if (editingLectureIndex >= 0 && editingLectureIndex < newGridData[key].length) {
+        // Update existing lecture
+        newGridData[key][editingLectureIndex] = { ...dialogData };
+      } else {
+        // Add new lecture
+        newGridData[key].push({ ...dialogData });
+      }
+      
       // Update last used room when saving a lecture
       setLastUsedRoom(dialogData.room);
     } else {
-      delete newGridData[key];
+      // If no valid data, remove the lecture or the entire slot
+      if (editingLectureIndex >= 0 && newGridData[key] && Array.isArray(newGridData[key])) {
+        newGridData[key].splice(editingLectureIndex, 1);
+        if (newGridData[key].length === 0) {
+          delete newGridData[key];
+        }
+      } else {
+        delete newGridData[key];
+      }
     }
 
     setGridData(newGridData);
     setSelectedCell(null);
+    setEditingLectureIndex(-1);
     setTimetableState(prev => ({
       ...prev,
       gridData: newGridData
@@ -875,6 +961,62 @@ const CreateTimeTable = () => {
       ...prev,
       gridData: newGridData
     }));
+  };
+
+  const handleClearSpecificLecture = (day, time, lectureIndex) => {
+    const key = `${day}-${time}`;
+    const newGridData = { ...gridData };
+    
+    if (newGridData[key] && Array.isArray(newGridData[key])) {
+      newGridData[key].splice(lectureIndex, 1);
+      if (newGridData[key].length === 0) {
+        delete newGridData[key];
+      }
+    } else {
+      delete newGridData[key];
+    }
+    
+    setGridData(newGridData);
+    setSelectedCell(null);
+    setEditingLectureIndex(-1);
+    setTimetableState(prev => ({
+      ...prev,
+      gridData: newGridData
+    }));
+  };
+
+  const handleAddAnotherLecture = () => {
+    setDialogData({ 
+      subject: "", 
+      code: "", 
+      faculty: "", 
+      room: lastUsedRoom 
+    });
+    setEditingLectureIndex(-1);
+  };
+
+  const handleSelectLectureToEdit = (index) => {
+    if (!selectedCell) return;
+    
+    const key = `${selectedCell.day}-${selectedCell.time}`;
+    const existingData = gridData[key];
+    
+    if (existingData && Array.isArray(existingData) && existingData[index]) {
+      const filteredSubjects = getFilteredSubjects();
+      const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === existingData[index].subject);
+      
+      if (isSubjectValidForCourse) {
+        setDialogData(existingData[index]);
+      } else {
+        setDialogData({ 
+          subject: "", 
+          code: "", 
+          faculty: "", 
+          room: existingData[index].room || lastUsedRoom 
+        });
+      }
+      setEditingLectureIndex(index);
+    }
   };
 
 
@@ -915,7 +1057,6 @@ const CreateTimeTable = () => {
   const handleGenerateTimetable = () => {
     if (allDetailsSelected()) {
       setShowTimetable(true);
-      setIsLocked(true);
     }
   };
 
@@ -1038,17 +1179,29 @@ const CreateTimeTable = () => {
     // Update grid data - remove any entries in deleted slots
     const newGridData = {};
     Object.keys(gridData).forEach(key => {
-      const [day, currentStart, currentEnd] = key.split('-');
-      const currentTimeSlot = `${currentStart}-${currentEnd}`;
+      const keyParts = key.split('-');
+      const day = keyParts[0];
+      const currentTimeSlot = keyParts.slice(1).join('-'); // Rejoin in case time has multiple dashes
 
       if (currentTimeSlot === oldTimeSlot) {
         // Update the key with new timeslot
-        const newKey = `${day}-${newStart}-${newEnd}`;
-        newGridData[newKey] = {
-          ...gridData[key],
-          startTime: newStart,
-          endTime: newEnd
-        };
+        const newKey = `${day}-${formattedTimeSlot}`;
+        const existingData = gridData[key];
+        
+        // Handle both array and single object formats
+        if (Array.isArray(existingData)) {
+          newGridData[newKey] = existingData.map(lecture => ({
+            ...lecture,
+            startTime: newStart,
+            endTime: newEnd
+          }));
+        } else {
+          newGridData[newKey] = {
+            ...existingData,
+            startTime: newStart,
+            endTime: newEnd
+          };
+        }
       } else if (newTimeSlots.includes(currentTimeSlot)) {
         // Only keep if the timeslot still exists
         newGridData[key] = gridData[key];
@@ -1079,7 +1232,6 @@ const CreateTimeTable = () => {
     });
     setIsSemesterAutoSelected(false);
     setShowTimetable(false);
-    setIsLocked(false);
   };
 
   // Handle semester selection change
@@ -1092,7 +1244,6 @@ const CreateTimeTable = () => {
     // Clear auto-selected flag when manually changing semester
     setIsSemesterAutoSelected(false);
     setShowTimetable(false);
-    setIsLocked(false);
   };
   const refresh = () => {
     setIsSemesterAutoSelected(false);
@@ -1138,7 +1289,7 @@ const CreateTimeTable = () => {
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Course</label>
                 <Select
-                  disabled={isLocked || loading}
+                  disabled={loading}
                   value={batchDetails.course}
                   onValueChange={handleCourseChange}
                 >
@@ -1163,7 +1314,7 @@ const CreateTimeTable = () => {
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Batch</label>
                 <Select
-                  disabled={isLocked || loading || !batchDetails.course}
+                  disabled={loading || !batchDetails.course}
                   value={batchDetails.batch}
                   onValueChange={(value) => {
                     // Extract batch year from the batch value (format: "YYYY-Section")
@@ -1179,7 +1330,6 @@ const CreateTimeTable = () => {
                     });
                     setIsSemesterAutoSelected(true);
                     setShowTimetable(false);
-                    setIsLocked(false);
                   }}
                 >
                   <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
@@ -1207,7 +1357,7 @@ const CreateTimeTable = () => {
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Semester</label>
                 <Select
-                  disabled={isLocked || loading || !batchDetails.batch}
+                  disabled={loading || !batchDetails.batch}
                   value={batchDetails.semester}
                   onValueChange={handleSemesterChange}
                 >
@@ -1345,6 +1495,8 @@ const CreateTimeTable = () => {
                     <div className="space-y-2">
                       {timeSlots.map((time) => {
                         const cellData = gridData[`${day}-${time}`];
+                        const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
+                        
                         return (
                           <div
                             key={`${day}-${time}`}
@@ -1354,22 +1506,48 @@ const CreateTimeTable = () => {
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <div className="text-sm font-semibold text-gray-600 mb-1">{time}</div>
-                                {cellData ? (
-                                  <div>
-                                    <div className="font-semibold text-indigo-700 text-sm mb-1">
-                                      {cellData.subject}
-                                    </div>
-                                    <div className="text-xs text-gray-600 mb-1">
-                                      {cellData.code}
-                                    </div>
-                                    <div className="text-xs text-gray-500 mb-1">
-                                      {cellData.faculty}
-                                    </div>
-                                    {cellData.room && (
-                                      <div className="text-xs text-gray-500">
-                                        Room: {cellData.room}
+                                {lectures.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {lectures.map((lecture, index) => (
+                                      <div key={index}>
+                                        {index > 0 && (
+                                          <div className="flex items-center my-2">
+                                            <div className="flex-1 h-px bg-blue-300"></div>
+                                            <div className="px-2 text-xs text-blue-600 font-medium">•</div>
+                                            <div className="flex-1 h-px bg-blue-300"></div>
+                                          </div>
+                                        )}
+                                        <div className={`${lectures.length > 1 ? 'border-l-2 border-indigo-300 pl-2' : ''}`}>
+                                          <div className="font-semibold text-indigo-700 text-sm mb-1">
+                                            {lecture.subject}
+                                            {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
+                                          </div>
+                                          <div className="text-xs text-gray-600 mb-1">
+                                            {lecture.code}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mb-1">
+                                            {lecture.faculty}
+                                          </div>
+                                          {lecture.room && (
+                                            <div className="text-xs text-gray-500">
+                                              Room: {lecture.room}
+                                            </div>
+                                          )}
+                                          {lectures.length > 1 && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleClearSpecificLecture(day, time, index);
+                                              }}
+                                              className="text-red-500 hover:text-red-700 text-xs mt-1"
+                                              title="Remove this lecture"
+                                            >
+                                              Remove
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
+                                    ))}
                                   </div>
                                 ) : (
                                   <div className="text-gray-400 text-sm">Tap to add class</div>
@@ -1396,6 +1574,18 @@ const CreateTimeTable = () => {
                                 >
                                   <Trash2 size={14} />
                                 </button>
+                                {cellData && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleClearCell(day, time);
+                                    }}
+                                    className="text-orange-600 hover:text-orange-800 p-1 rounded"
+                                    title="Clear all lectures"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1419,7 +1609,7 @@ const CreateTimeTable = () => {
                       {timeSlots.map((time, index) => (
                         <th
                           key={index}
-                          className="border-r border-gray-200 p-3 text-center font-semibold text-indigo-700 relative min-w-[140px]"
+                          className="border-r border-gray-200 p-3 text-center font-semibold text-indigo-700 relative min-w-[200px]"
                         >
                           <div className="flex items-center justify-center gap-2">
                             <span className="text-sm font-medium">{time}</span>
@@ -1455,7 +1645,8 @@ const CreateTimeTable = () => {
                           </td>
                           {timeSlots.map((time, timeIndex) => {
                             const cellKey = `${day}-${time}`;
-                            const lecture = gridData[cellKey];
+                            const cellData = gridData[cellKey];
+                            const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
                             const groupedLecture = groupedLectures[cellKey];
 
                             // Skip rendering if this is part of a group but not the first in the group
@@ -1471,28 +1662,42 @@ const CreateTimeTable = () => {
                             return (
                               <td
                                 key={cellKey}
-                                className={`border-r border-gray-200 p-3 text-center cursor-pointer hover:bg-indigo-50 transition-colors duration-200 h-24 ${colSpan > 1 ? 'bg-blue-50' : ''}`}
+                                className={`border-r border-gray-200 p-3 text-center cursor-pointer hover:bg-indigo-50 transition-colors duration-200 min-h-[100px] ${colSpan > 1 ? 'bg-blue-50' : ''} ${lectures.length > 1 ? 'bg-gradient-to-br from-indigo-50 to-purple-50' : ''}`}
                                 onClick={() => handleCellClick(day, time)}
                                 colSpan={colSpan}
                               >
-                                {lecture ? (
-                                  <div className="space-y-1">
-                                    <div className="font-semibold text-indigo-700 text-sm leading-tight">
-                                      {lecture.subject}
-                                    </div>
-                                    <div className="text-xs text-gray-600 font-medium">
-                                      {lecture.code}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {lecture.faculty}
-                                    </div>
-                                    {lecture.room && (
-                                      <div className="text-xs text-gray-400">
-                                        {lecture.room}
+                                {lectures.length > 0 ? (
+                                  <div>
+                                    {lectures.map((lecture, index) => (
+                                      <div key={index}>
+                                        {index > 0 && (
+                                          <div className="flex items-center my-1">
+                                            <div className="flex-1 h-px bg-blue-400"></div>
+                                            <div className="px-1 text-xs text-blue-600 font-bold">•</div>
+                                            <div className="flex-1 h-px bg-blue-400"></div>
+                                          </div>
+                                        )}
+                                        <div className={`${lectures.length > 1 ? 'text-left' : ''}`}>
+                                          <div className="font-semibold text-indigo-700 text-sm leading-tight">
+                                            {lecture.subject}
+                                            {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
+                                          </div>
+                                          <div className="text-xs text-gray-600 font-medium">
+                                            {lecture.code}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {lecture.faculty}
+                                          </div>
+                                          {lecture.room && (
+                                            <div className="text-xs text-gray-400">
+                                              {lecture.room}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
+                                    ))}
                                     {colSpan > 1 && (
-                                      <div className="text-xs text-gray-400 mt-1">
+                                      <div className="text-xs text-gray-400 mt-1 w-full">
                                         {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
                                       </div>
                                     )}
@@ -1517,131 +1722,214 @@ const CreateTimeTable = () => {
       )}
 
       {/* Dialog for adding/editing entries */}
-      <Dialog open={selectedCell !== null} onOpenChange={() => setSelectedCell(null)}>
-        <DialogContent className="sm:max-w-md mx-4 rounded-2xl">
+      <Dialog open={selectedCell !== null} onOpenChange={() => {
+        setSelectedCell(null);
+        setEditingLectureIndex(-1);
+        setDialogData({ subject: "", code: "", faculty: "", room: lastUsedRoom });
+      }}>
+        <DialogContent className="sm:max-w-fit  rounded-2xl bg-white shadow-2xl border border-gray-200">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-indigo-700">
               {selectedCell && gridData[`${selectedCell.day}-${selectedCell.time}`]
-                ? "Edit Class Entry"
+                ? `Manage Classes - ${selectedCell.day} ${selectedCell.time}`
                 : "Add New Class"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Subject</label>
-              <Select
-                value={dialogData.subject}
-                onValueChange={(value) => handleDialogInputChange("subject", value)}
-                disabled={!batchDetails.course}
-              >
-                <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                  <SelectValue placeholder={!batchDetails.course ? "Select course first" : "Select subject"} />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-2 shadow-lg">
-                  {getFilteredSubjects().length === 0 && batchDetails.course ? (
-                    <div className="px-4 py-2 text-sm text-gray-500 text-center">
-                      No subjects available for {batchDetails.course}
+
+          {/* Show existing lectures */}
+          {selectedCell && (() => {
+            const existingLectures = gridData[`${selectedCell.day}-${selectedCell.time}`];
+            const lectures = Array.isArray(existingLectures) ? existingLectures : (existingLectures ? [existingLectures] : []);
+            
+            return lectures.length > 0 && (
+              <div className="mb-4 bg-gray-50 w-full rounded-xl">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Users size={16} />
+                  Existing Lectures ({lectures.length})
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {lectures.map((lecture, index) => (
+                    <div key={index} className="bg-white p-3 rounded-lg border border-gray-200 flex flex-col">
+                      <div className="flex-1 mb-3">
+                        <div className="font-medium text-sm text-indigo-700 mb-1">{lecture.subject}</div>
+                        <div className="text-xs text-gray-600 mb-1">{lecture.code}</div>
+                        <div className="text-xs text-gray-600 mb-1">{lecture.faculty}</div>
+                        <div className="text-xs text-gray-500">{lecture.room}</div>
+                      </div>
+                      <div className="flex gap-2 mt-auto">
+                        <button
+                          onClick={() => handleSelectLectureToEdit(index)}
+                          className={`flex-1 px-3 py-1 text-xs rounded-lg transition-colors ${
+                            editingLectureIndex === index 
+                              ? 'bg-indigo-600 text-white' 
+                              : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                          }`}
+                        >
+                          {editingLectureIndex === index ? 'Editing' : 'Edit'}
+                        </button>
+                        <button
+                          onClick={() => handleClearSpecificLecture(selectedCell.day, selectedCell.time, index)}
+                          className="flex-1 px-3 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  ) : (
-                    getFilteredSubjects().map((subject) => (
-                      <SelectItem key={subject.ID} value={subject.Name} className="rounded-lg">
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="space-y-6">
+            {/* Status indicator */}
+            {selectedCell && (
+              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200 max-w-full">
+                <div className="text-sm text-indigo-800 text-center">
+                  {editingLectureIndex >= 0 
+                    ? `Editing Lecture ${editingLectureIndex + 1} in ${selectedCell.day} ${selectedCell.time}`
+                    : `Adding new lecture to ${selectedCell.day} ${selectedCell.time}`
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Current form for editing */}
+            <div className="w-full  space-y-4">
+              {/* Subject and Subject Code in flex container */}
+              <div className="flex gap-4">
+                <div className="space-y-2 flex-1">
+                  <label className="block text-sm font-semibold text-gray-700">Subject</label>
+                  <Select
+                    value={dialogData.subject}
+                    onValueChange={(value) => handleDialogInputChange("subject", value)}
+                    disabled={!batchDetails.course}
+                  >
+                    <SelectTrigger className="w-full border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                      <SelectValue placeholder={!batchDetails.course ? "Select course first" : "Select subject"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl  border-2 shadow-lg">
+                      {getFilteredSubjects().length === 0 && batchDetails.course ? (
+                        <div className="px-4 py-2 text-sm text-gray-500 text-center">
+                          No subjects available for {batchDetails.course}
+                        </div>
+                      ) : (
+                        getFilteredSubjects().map((subject) => (
+                          <SelectItem key={subject.ID} value={subject.Name} className="h-14 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium">{subject.Name}</span>
+                              <span className="text-xs text-gray-500">{subject.Code}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 w-32">
+                  <label className="block text-sm font-semibold text-gray-700">Subject Code</label>
+                  <Input
+                    value={dialogData.code}
+                    onChange={(e) => handleDialogInputChange("code", e.target.value)}
+                    placeholder="Subject code"
+                    readOnly
+                    className="h-9 border-2 border-gray-200 rounded-xl bg-gray-50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Faculty</label>
+                <Select
+                  value={dialogData.faculty}
+                  onValueChange={(value) => handleDialogInputChange("faculty", value)}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select faculty" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    {faculties.map((faculty) => (
+                      <SelectItem key={faculty.ID} value={faculty.Name} className="rounded-lg">
                         <div className="flex flex-col">
-                          <span className="font-medium">{subject.Name}</span>
-                          <span className="text-xs text-gray-500">{subject.Code}</span>
+                          <span className="font-medium">{faculty.Name}</span>
+                          {faculty.Email && (
+                            <span className="text-xs text-gray-500">{faculty.Email}</span>
+                          )}
                         </div>
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Subject Code</label>
-              <Input
-                value={dialogData.code}
-                onChange={(e) => handleDialogInputChange("code", e.target.value)}
-                placeholder="Subject code"
-                readOnly
-                className="h-12 border-2 border-gray-200 rounded-xl bg-gray-50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Faculty</label>
-              <Select
-                value={dialogData.faculty}
-                onValueChange={(value) => handleDialogInputChange("faculty", value)}
-              >
-                <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                  <SelectValue placeholder="Select faculty" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-2 shadow-lg">
-                  {faculties.map((faculty) => (
-                    <SelectItem key={faculty.ID} value={faculty.Name} className="rounded-lg">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{faculty.Name}</span>
-                        {faculty.Email && (
-                          <span className="text-xs text-gray-500">{faculty.Email}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Room</label>
-              <Select
-                value={dialogData.room}
-                onValueChange={(value) => handleDialogInputChange("room", value)}
-              >
-                <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                  <SelectValue placeholder="Select room" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-2 shadow-lg">
-                  {rooms.map((room) => (
-                    <SelectItem key={room.ID} value={room.Name} className="rounded-lg">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{room.Name}</span>
-                        {room.Capacity && (
-                          <span className="text-xs text-gray-500">Capacity: {room.Capacity}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Room</label>
+                <Select
+                  value={dialogData.room}
+                  onValueChange={(value) => handleDialogInputChange("room", value)}
+                >
+                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    <SelectValue placeholder="Select room" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-2 shadow-lg">
+                    {rooms.map((room) => (
+                      <SelectItem key={room.ID} value={room.Name} className="rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium">{room.Name}</span>
+                          {room.Capacity && (
+                            <span className="text-xs text-gray-500">Capacity: {room.Capacity}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
+          <DialogFooter className="flex flex-col gap-3 mt-6">
+            {/* Add Another Lecture Button */}
             {selectedCell && gridData[`${selectedCell.day}-${selectedCell.time}`] && (
               <Button
-                variant="destructive"
-                onClick={() => {
-                  handleClearCell(selectedCell.day, selectedCell.time);
-                  setSelectedCell(null);
-                }}
-                className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium"
+                variant="outline"
+                onClick={handleAddAnotherLecture}
+                className="w-fit bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 rounded-xl font-medium flex items-center gap-2"
               >
-                Clear Entry
+                <Plus size={16} />
+                Add Another Lecture in Same Slot
               </Button>
             )}
-            <div className="flex gap-2 flex-1">
-              <DialogClose asChild>
-                <Button variant="outline" className="flex-1 rounded-xl border-2 hover:bg-gray-50">
-                  Cancel
+            
+            {/* Main Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              {selectedCell && gridData[`${selectedCell.day}-${selectedCell.time}`] && (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    handleClearCell(selectedCell.day, selectedCell.time);
+                    setSelectedCell(null);
+                  }}
+                  className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium"
+                >
+                  Clear All Lectures
                 </Button>
-              </DialogClose>
-              <Button
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-medium"
-                onClick={handleSaveEntry}
-                disabled={!dialogData.subject || !dialogData.faculty || !dialogData.room}
-              >
-                Save Class
-              </Button>
+              )}
+              <div className="flex gap-2 flex-1">
+                <DialogClose asChild>
+                  <Button variant="outline" className="flex-1 rounded-xl border-2 hover:bg-gray-50">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-medium"
+                  onClick={handleSaveEntry}
+                  disabled={!dialogData.subject || !dialogData.faculty || !dialogData.room}
+                >
+                  {editingLectureIndex >= 0 ? 'Update Lecture' : 'Save Lecture'}
+                </Button>
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>
