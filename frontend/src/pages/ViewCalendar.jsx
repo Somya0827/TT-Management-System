@@ -441,13 +441,14 @@ function ViewCalendar() {
       console.log("Status updated successfully:", data);
 
       // Clear cache for the affected month
-      const cacheKey = `${currentDate.getMonth()}-${currentDate.getFullYear()}-${selectedCourse}-${selectedFaculty}-${selectedSemester}`;
+      const cacheKey = `${currentDate.getMonth()}-${currentDate.getFullYear()}-${selectedCourse}-${selectedFaculty}-${selectedSemester}-${selectedRoom}`;
       delete calendarCache.current[cacheKey];
 
       setShowStatusModal(false);
       setSelectedLecture(null);
       setError(null);
 
+      // Refresh the calendar data and day details to show updated information
       await Promise.all([
         fetchMonthSummary(),
         selectedDate && fetchDayDetails(selectedDate)
