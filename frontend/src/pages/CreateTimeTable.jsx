@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "../components/SearchableSelect";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +22,7 @@ const groupConsecutiveTimeSlots = (gridData, days, timeSlots) => {
     timeSlots.forEach((time, timeIndex) => {
       const key = `${day}-${time}`;
       const cellData = gridData[key];
-      
+
       // Handle both array and single object formats
       const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
       const lecture = lectures.length > 0 ? lectures[0] : null; // Use first lecture for grouping
@@ -292,10 +286,10 @@ const CreateTimeTable = () => {
     try {
       const [year, section] = batchDetails.batch.split('-');
       const selectedCourse = courses.find(course => course.Name === batchDetails.course);
-      
+
       // Find batch by year, section AND course ID
       const selectedBatch = batches.find(batch =>
-        batch.Year === parseInt(year) && 
+        batch.Year === parseInt(year) &&
         batch.Section === section &&
         batch.CourseID === selectedCourse?.ID
       );
@@ -414,7 +408,7 @@ const CreateTimeTable = () => {
       const [year, section] = batchDetails.batch.split('-');
       const selectedCourse = courses.find(course => course.Name === batchDetails.course);
       const selectedBatch = batches.find(batch =>
-        batch.Year === parseInt(year) && 
+        batch.Year === parseInt(year) &&
         batch.Section === section &&
         batch.CourseID === selectedCourse?.ID
       );
@@ -463,17 +457,17 @@ const CreateTimeTable = () => {
 
       // Process current grid data
       console.log('Current timetableState.gridData:', timetableState.gridData);
-      
+
       const lecturesToProcess = Object.entries(timetableState.gridData)
         .flatMap(([key, lectures]) => {
           const keyParts = key.split('-');
           const day = keyParts[0];
           const timeSlot = keyParts.slice(1).join('-'); // Rejoin in case time has multiple dashes
           const [startTime, endTime] = timeSlot.split('-');
-          
+
           // Handle both array and single object formats for backward compatibility
           const lectureArray = Array.isArray(lectures) ? lectures : [lectures];
-          
+
           return lectureArray.map(entry => {
             const subject = subjects.find(sub => sub.Name === entry.subject);
             const faculty = faculties.find(fac => fac.Name === entry.faculty);
@@ -484,7 +478,7 @@ const CreateTimeTable = () => {
             // CRITICAL FIX: Only treat as existing lecture if it belongs to current batch
             let lectureID = null;
             let isValidExistingLecture = false;
-            
+
             if (entry.id) {
               // Check if this lecture ID exists in the current batch's existing lectures
               const existingLecture = existingLectures.find(el => el.ID === entry.id);
@@ -571,7 +565,7 @@ const CreateTimeTable = () => {
         // Don't delete if this lecture was updated or is still present in grid
         const wasUpdated = lecturesToUpdate.some(update => update.ID === lecture.ID);
         const isStillPresent = currentLectureIds.has(lecture.ID);
-        
+
         return !wasUpdated && !isStillPresent;
       });
 
@@ -700,7 +694,7 @@ const CreateTimeTable = () => {
   const getFilteredBatches = () => {
     if (!batchDetails.course) return batches;
     const selectedCourse = courses.find(course => course.Name === batchDetails.course);
-    
+
     if (!selectedCourse) {
       return [];
     }
@@ -721,7 +715,7 @@ const CreateTimeTable = () => {
   const getFilteredSubjects = () => {
     if (!batchDetails.course) return subjects;
     const selectedCourse = courses.find(course => course.Name === batchDetails.course);
-    
+
     if (!selectedCourse) {
       return [];
     }
@@ -734,13 +728,13 @@ const CreateTimeTable = () => {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
-    
+
     // Calculate academic year - if current month is before June (6), we're still in the previous academic year
     const academicYear = currentMonth >= 6 ? currentYear : currentYear - 1;
-    
+
     // Calculate years since batch started
     const yearsSinceStart = academicYear - parseInt(batchYear);
-    
+
     // Calculate semester based on years and current month
     // If current month is June-December (6-12), it's odd semester (1, 3, 5, 7)
     // If current month is January-May (1-5), it's even semester (2, 4, 6, 8)
@@ -752,10 +746,10 @@ const CreateTimeTable = () => {
       // Even semester (January-June)
       semester = (yearsSinceStart * 2);
     }
-    
+
     // Ensure semester is within valid range (1-10 based on academicData)
     semester = Math.max(1, Math.min(10, semester));
-    
+
     return semester.toString();
   };
 
@@ -829,22 +823,22 @@ const CreateTimeTable = () => {
   const handleCellClick = (day, time) => {
     setSelectedCell({ day, time });
     const existingData = gridData[`${day}-${time}`];
-    
+
     if (existingData && Array.isArray(existingData) && existingData.length > 0) {
       // If editing existing lectures, show the first one by default
       const firstLecture = existingData[0];
       const filteredSubjects = getFilteredSubjects();
       const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === firstLecture.subject);
-      
+
       if (isSubjectValidForCourse) {
         setDialogData(firstLecture);
         setEditingLectureIndex(0);
       } else {
-        setDialogData({ 
-          subject: "", 
-          code: "", 
-          faculty: "", 
-          room: firstLecture.room || lastUsedRoom 
+        setDialogData({
+          subject: "",
+          code: "",
+          faculty: "",
+          room: firstLecture.room || lastUsedRoom
         });
         setEditingLectureIndex(-1);
       }
@@ -852,26 +846,26 @@ const CreateTimeTable = () => {
       // Handle backward compatibility with single lecture objects
       const filteredSubjects = getFilteredSubjects();
       const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === existingData.subject);
-      
+
       if (isSubjectValidForCourse) {
         setDialogData(existingData);
         setEditingLectureIndex(0);
       } else {
-        setDialogData({ 
-          subject: "", 
-          code: "", 
-          faculty: "", 
-          room: existingData.room || lastUsedRoom 
+        setDialogData({
+          subject: "",
+          code: "",
+          faculty: "",
+          room: existingData.room || lastUsedRoom
         });
         setEditingLectureIndex(-1);
       }
     } else {
       // If adding new lecture, pre-select last used room
-      setDialogData({ 
-        subject: "", 
-        code: "", 
-        faculty: "", 
-        room: lastUsedRoom 
+      setDialogData({
+        subject: "",
+        code: "",
+        faculty: "",
+        room: lastUsedRoom
       });
       setEditingLectureIndex(-1);
     }
@@ -928,7 +922,7 @@ const CreateTimeTable = () => {
         // Add new lecture
         newGridData[key].push({ ...dialogData });
       }
-      
+
       // Update last used room when saving a lecture
       setLastUsedRoom(dialogData.room);
     } else {
@@ -966,7 +960,7 @@ const CreateTimeTable = () => {
   const handleClearSpecificLecture = (day, time, lectureIndex) => {
     const key = `${day}-${time}`;
     const newGridData = { ...gridData };
-    
+
     if (newGridData[key] && Array.isArray(newGridData[key])) {
       newGridData[key].splice(lectureIndex, 1);
       if (newGridData[key].length === 0) {
@@ -975,7 +969,7 @@ const CreateTimeTable = () => {
     } else {
       delete newGridData[key];
     }
-    
+
     setGridData(newGridData);
     setSelectedCell(null);
     setEditingLectureIndex(-1);
@@ -986,33 +980,33 @@ const CreateTimeTable = () => {
   };
 
   const handleAddAnotherLecture = () => {
-    setDialogData({ 
-      subject: "", 
-      code: "", 
-      faculty: "", 
-      room: lastUsedRoom 
+    setDialogData({
+      subject: "",
+      code: "",
+      faculty: "",
+      room: lastUsedRoom
     });
     setEditingLectureIndex(-1);
   };
 
   const handleSelectLectureToEdit = (index) => {
     if (!selectedCell) return;
-    
+
     const key = `${selectedCell.day}-${selectedCell.time}`;
     const existingData = gridData[key];
-    
+
     if (existingData && Array.isArray(existingData) && existingData[index]) {
       const filteredSubjects = getFilteredSubjects();
       const isSubjectValidForCourse = filteredSubjects.some(sub => sub.Name === existingData[index].subject);
-      
+
       if (isSubjectValidForCourse) {
         setDialogData(existingData[index]);
       } else {
-        setDialogData({ 
-          subject: "", 
-          code: "", 
-          faculty: "", 
-          room: existingData[index].room || lastUsedRoom 
+        setDialogData({
+          subject: "",
+          code: "",
+          faculty: "",
+          room: existingData[index].room || lastUsedRoom
         });
       }
       setEditingLectureIndex(index);
@@ -1187,7 +1181,7 @@ const CreateTimeTable = () => {
         // Update the key with new timeslot
         const newKey = `${day}-${formattedTimeSlot}`;
         const existingData = gridData[key];
-        
+
         // Handle both array and single object formats
         if (Array.isArray(existingData)) {
           newGridData[newKey] = existingData.map(lecture => ({
@@ -1276,7 +1270,7 @@ const CreateTimeTable = () => {
 
       {/* Controls */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100">
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex justify-between items-center">
             <div>
               <h1 className="text-xl font-bold text-white">Timetable Generator</h1>
@@ -1286,94 +1280,56 @@ const CreateTimeTable = () => {
 
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
+              <div className="space-y-2 z-30">
                 <label className="block text-sm font-semibold text-gray-700">Course</label>
-                <Select
-                  disabled={loading}
-                  value={batchDetails.course}
-                  onValueChange={handleCourseChange}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select course" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    {courses.map((course) => (
-                      <SelectItem key={course.ID} value={course.Name} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{course.Name}</span>
-                          {course.Code && (
-                            <span className="text-xs text-gray-500">{course.Code}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <SearchableSelect
+                    disabled={loading}
+                    value={batchDetails.course}
+                    onSelect={handleCourseChange}
+                    placeholder="Select course"
+                    options={courses.map((course) => ({
+                      value: course.Name,
+                      label: course.Name,
+                    }))}
+                  />
               </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Batch</label>
-                <Select
+                <SearchableSelect
                   disabled={loading || !batchDetails.course}
                   value={batchDetails.batch}
-                  onValueChange={(value) => {
-                    // Extract batch year from the batch value (format: "YYYY-Section")
-                    const batchYear = value.split('-')[0];
-                    
-                    // Calculate and auto-select current semester
+                  onSelect={(value) => {
+                    const batchYear = value.split("-")[0];
                     const currentSemester = calculateCurrentSemester(batchYear);
-                    
                     setBatchDetails({
                       ...batchDetails,
                       batch: value,
-                      semester: currentSemester
+                      semester: currentSemester,
                     });
                     setIsSemesterAutoSelected(true);
                     setShowTimetable(false);
                   }}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select batch" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    {getFilteredBatches().map((batch) => (
-                      <SelectItem
-                        key={batch.ID}
-                        value={`${batch.Year}-${batch.Section}`}
-                        className="rounded-lg"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">Batch {batch.Year} - Section {batch.Section}</span>
-                          {batch.Course?.Name && (
-                            <span className="text-xs text-gray-500">{batch.Course.Name}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select batch"
+                  options={getFilteredBatches().map((batch) => ({
+                    value: `${batch.Year}-${batch.Section}`,
+                    label: `Batch ${batch.Year} - Section ${batch.Section}`,
+                  }))}
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Semester</label>
-                <Select
-                  disabled={loading || !batchDetails.batch}
-                  value={batchDetails.semester}
-                  onValueChange={handleSemesterChange}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select semester" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    {getFilteredSemesters().map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id || semester.number?.toString()} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{semester.id || semester.number}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <SearchableSelect
+                    disabled={loading || !batchDetails.batch}
+                    value={batchDetails.semester}
+                    onSelect={handleSemesterChange}
+                    placeholder="Select semester"
+                    options={getFilteredSemesters().map((semester) => ({
+                      value: semester.id || semester.number?.toString(),
+                      label: semester.id || semester.number.toString(),
+                    }))}
+                  />
                 {isSemesterAutoSelected && batchDetails.batch && batchDetails.semester && (
                   <div className="text-xs text-indigo-600 flex items-center gap-1">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -1496,7 +1452,7 @@ const CreateTimeTable = () => {
                       {timeSlots.map((time) => {
                         const cellData = gridData[`${day}-${time}`];
                         const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
-                        
+
                         return (
                           <div
                             key={`${day}-${time}`}
@@ -1740,7 +1696,7 @@ const CreateTimeTable = () => {
           {selectedCell && (() => {
             const existingLectures = gridData[`${selectedCell.day}-${selectedCell.time}`];
             const lectures = Array.isArray(existingLectures) ? existingLectures : (existingLectures ? [existingLectures] : []);
-            
+
             return lectures.length > 0 && (
               <div className="mb-4 bg-gray-50 w-full rounded-xl">
                 <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1760,8 +1716,8 @@ const CreateTimeTable = () => {
                         <button
                           onClick={() => handleSelectLectureToEdit(index)}
                           className={`flex-1 px-3 py-1 text-xs rounded-lg transition-colors ${
-                            editingLectureIndex === index 
-                              ? 'bg-indigo-600 text-white' 
+                            editingLectureIndex === index
+                              ? 'bg-indigo-600 text-white'
                               : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
                           }`}
                         >
@@ -1786,7 +1742,7 @@ const CreateTimeTable = () => {
             {selectedCell && (
               <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200 max-w-full">
                 <div className="text-sm text-indigo-800 text-center">
-                  {editingLectureIndex >= 0 
+                  {editingLectureIndex >= 0
                     ? `Editing Lecture ${editingLectureIndex + 1} in ${selectedCell.day} ${selectedCell.time}`
                     : `Adding new lecture to ${selectedCell.day} ${selectedCell.time}`
                   }
@@ -1800,31 +1756,16 @@ const CreateTimeTable = () => {
               <div className="flex gap-4">
                 <div className="space-y-2 flex-1">
                   <label className="block text-sm font-semibold text-gray-700">Subject</label>
-                  <Select
-                    value={dialogData.subject}
-                    onValueChange={(value) => handleDialogInputChange("subject", value)}
-                    disabled={!batchDetails.course}
-                  >
-                    <SelectTrigger className="w-full border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                      <SelectValue placeholder={!batchDetails.course ? "Select course first" : "Select subject"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl  border-2 shadow-lg">
-                      {getFilteredSubjects().length === 0 && batchDetails.course ? (
-                        <div className="px-4 py-2 text-sm text-gray-500 text-center">
-                          No subjects available for {batchDetails.course}
-                        </div>
-                      ) : (
-                        getFilteredSubjects().map((subject) => (
-                          <SelectItem key={subject.ID} value={subject.Name} className="h-14 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium">{subject.Name}</span>
-                              <span className="text-xs text-gray-500">{subject.Code}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                    <SearchableSelect
+                      options={getFilteredSubjects().map(subject => ({
+                        value: subject.Name,
+                        label: `${subject.Name} (${subject.Code})`
+                      }))}
+                      onSelect={(value) => handleDialogInputChange("subject", value)}
+                      placeholder={!batchDetails.course ? "Select course first" : "Select subject"}
+                      value={dialogData.subject}
+                      disabled={!batchDetails.course}
+                    />
                 </div>
 
                 <div className="space-y-2 w-32">
@@ -1841,50 +1782,28 @@ const CreateTimeTable = () => {
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Faculty</label>
-                <Select
-                  value={dialogData.faculty}
-                  onValueChange={(value) => handleDialogInputChange("faculty", value)}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select faculty" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    {faculties.map((faculty) => (
-                      <SelectItem key={faculty.ID} value={faculty.Name} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{faculty.Name}</span>
-                          {faculty.Email && (
-                            <span className="text-xs text-gray-500">{faculty.Email}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <SearchableSelect
+                    options={faculties.map(faculty => ({
+                      value: faculty.Name,
+                      label: `${faculty.Name}${faculty.Email ? ` (${faculty.Email})` : ''}`
+                    }))}
+                    onSelect={(value) => handleDialogInputChange("faculty", value)}
+                    placeholder="Select faculty"
+                    value={dialogData.faculty}
+                  />
               </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Room</label>
-                <Select
-                  value={dialogData.room}
-                  onValueChange={(value) => handleDialogInputChange("room", value)}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select room" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    {rooms.map((room) => (
-                      <SelectItem key={room.ID} value={room.Name} className="rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium">{room.Name}</span>
-                          {room.Capacity && (
-                            <span className="text-xs text-gray-500">Capacity: {room.Capacity}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <SearchableSelect
+                    options={rooms.map(room => ({
+                      value: room.Name,
+                      label: `${room.Name}${room.Capacity ? ` (Capacity: ${room.Capacity})` : ''}`
+                    }))}
+                    onSelect={(value) => handleDialogInputChange("room", value)}
+                    placeholder="Select room"
+                    value={dialogData.room}
+                  />
               </div>
             </div>
           </div>
@@ -1901,7 +1820,7 @@ const CreateTimeTable = () => {
                 Add Another Lecture in Same Slot
               </Button>
             )}
-            
+
             {/* Main Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-2">
               {selectedCell && gridData[`${selectedCell.day}-${selectedCell.time}`] && (

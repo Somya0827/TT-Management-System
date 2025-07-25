@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import SearchableSelect from "../components/SearchableSelect";
 import {
   Calendar,
   Clock,
@@ -192,6 +193,7 @@ function MarkLectures() {
   const [selectedSemester, setSelectedSemester] = useState("all");
   const [selectedFaculty, setSelectedFaculty] = useState("all");
   const [initialLoading, setInitialLoading] = useState(true);
+  const [showSearch, setShowSearch] = useState(false); // State for search toggle
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const API_ENDPOINTS = {
@@ -447,7 +449,7 @@ function MarkLectures() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-6 mb-6">
+        <div className="relative z-10 bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center gap-2 sm:gap-4">
               <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-800 flex items-center gap-2 sm:gap-3">
@@ -478,67 +480,69 @@ function MarkLectures() {
           </div>
 
           {/* Filters Row */}
-          <div className="flex flex-col lg:flex-row gap-4 mt-6">
-            {/* Course, Semester and Faculty Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4 mt-6">
+            {/* Top row for filters and search toggle */}
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Search Toggle Button */}
+              <button
+                onClick={() => setShowSearch(prev => !prev)}
+                className="px-3 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Toggle Search Bar"
+              >
+                <Search className="w-5 h-5 text-gray-600" />
+              </button>
+
+              {/* Course Filter */}
               <div className="flex flex-col">
                 <label className="text-sm font-semibold text-gray-600 mb-1">Course</label>
-                <select
+                <SearchableSelect
                   value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm min-w-[160px]"
-                >
-                  <option value="all">All Courses</option>
-                  {courses.map(c => (
-                    <option key={c.ID} value={c.ID}>{c.Name}</option>
-                  ))}
-                </select>
+                  onSelect={setSelectedCourse}
+                  placeholder="Select Course"
+                  options={[
+                    { value: "all", label: "" },
+                    ...courses.map(c => ({
+                      value: c.ID,
+                      label: c.Name
+                    }))
+                  ]}
+                />
               </div>
 
+              {/* Semester Filter */}
               <div className="flex flex-col">
                 <label className="text-sm font-semibold text-gray-600 mb-1">Semester</label>
-                <select
+                <SearchableSelect
                   value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm min-w-[160px]"
-                >
-                  <option value="all">All Semesters</option>
-                  {semesters.map(s => (
-                    <option key={s.ID} value={s.ID || s.number}>{s.Name || `Semester ${s.number}`}</option>
-                  ))}
-                </select>
+                  onSelect={setSelectedSemester}
+                  placeholder="Select Semester"
+                  options={[
+                    { value: "all", label: "" },
+                    ...semesters.map(s => ({
+                      value: s.ID || s.number,
+                      label: s.Name || `Semester ${s.number}`
+                    }))
+                  ]}
+                />
               </div>
 
+              {/* Faculty Filter */}
               <div className="flex flex-col">
                 <label className="text-sm font-semibold text-gray-600 mb-1">Faculty</label>
-                <select
+                <SearchableSelect
                   value={selectedFaculty}
-                  onChange={(e) => setSelectedFaculty(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm min-w-[160px]"
-                >
-                  <option value="all">All Faculties</option>
-                  {faculties.map(f => (
-                    <option key={f.ID} value={f.ID}>{f.Name}</option>
-                  ))}
-                </select>
+                  onSelect={setSelectedFaculty}
+                  placeholder="Select Faculty"
+                  options={[
+                    { value: "all", label: "" },
+                    ...faculties.map(f => ({
+                      value: f.ID,
+                      label: f.Name
+                    }))
+                  ]}
+                />
               </div>
-            </div>
-
-            {/* Search and Additional Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 flex-1">
-              <div className="flex flex-col flex-1">
-                <label className="text-sm font-semibold text-gray-600 mb-1">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search by subject, faculty, course..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm w-full"
-                  />
-                </div>
-              </div>
+              <div className="flex-grow"></div>
 
               <div className="flex flex-col">
                 <label className="text-sm font-semibold text-gray-600 mb-1">Status</label>
@@ -569,11 +573,28 @@ function MarkLectures() {
                 </select>
               </div>
             </div>
+
+            {/* Conditionally rendered search bar */}
+            {showSearch && (
+              <div className="w-full">
+                <label className="text-sm font-semibold text-gray-600 mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search by subject, faculty, course..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 bg-white shadow-sm w-full"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Sessions List */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Spinner />
