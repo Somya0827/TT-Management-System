@@ -274,7 +274,7 @@ const Dashboard = () => {
       icon: FaTableCells,
       iconColor: "bg-teal-500",
       hoverColor: "hover:bg-teal-50",
-      route: "/class-timetable",
+      route: "/view-timetable",
     },
     {
       title: userRole === "admin" ? "Manage Courses" : "View Courses",
