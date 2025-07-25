@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import SearchableSelect from "../components/SearchableSelect";
 import academicData from "../assets/academicData.json";
 import { useNavigate } from 'react-router-dom';
 import { RefreshCcw } from "lucide-react";
@@ -289,22 +283,22 @@ const ViewTimeTable = () => {
     try {
       // Find the selected objects based on their IDs/names
       const selectedCourse = courses.find(c => c.ID === parseInt(selectedFilters.course));
-      
+
       // Find batch based on both the Year-Section format AND the selected course
       const selectedBatch = batches.find(b => {
         const batchValue = `${b.Year}-${b.Section}`;
         const matchesFormat = batchValue === selectedFilters.batch;
         const matchesCourse = selectedFilters.course ? b.CourseID === parseInt(selectedFilters.course) : true;
-        
+
         console.log('Checking batch:', batchValue, 'CourseID:', b.CourseID, 'Selected Course ID:', selectedFilters.course);
         console.log('Matches format:', matchesFormat, 'Matches course:', matchesCourse);
-        
+
         return matchesFormat && matchesCourse;
       });
-      
+
       const selectedFaculty = faculties.find(f => f.ID === parseInt(selectedFilters.faculty));
       const selectedRoom = rooms.find(r => r.ID === parseInt(selectedFilters.room));
-      
+
       // Debug logging
       console.log('=== FETCH LECTURES DEBUG ===');
       console.log('Selected filters:', selectedFilters);
@@ -312,7 +306,7 @@ const ViewTimeTable = () => {
       console.log('Found batch:', selectedBatch);
       console.log('Found faculty:', selectedFaculty);
       console.log('Found room:', selectedRoom);
-      
+
       // Validate that the batch belongs to the selected course
       if (selectedBatch && selectedCourse && selectedBatch.CourseID !== selectedCourse.ID) {
         console.error('MISMATCH: Selected batch does not belong to selected course!');
@@ -320,15 +314,15 @@ const ViewTimeTable = () => {
         setError('Selected batch does not belong to the selected course. Please reselect.');
         return;
       }
-      
+
       // Convert semester to integer if it's a string
       let semesterNumber;
       if (selectedFilters.semester !== undefined && selectedFilters.semester !== null) {
         // If semester is already a number, use it; otherwise convert from roman numeral
-        semesterNumber = typeof selectedFilters.semester === 'number' 
-          ? selectedFilters.semester 
-          : (isNaN(selectedFilters.semester) 
-            ? romanToInteger(selectedFilters.semester) 
+        semesterNumber = typeof selectedFilters.semester === 'number'
+          ? selectedFilters.semester
+          : (isNaN(selectedFilters.semester)
+            ? romanToInteger(selectedFilters.semester)
             : parseInt(selectedFilters.semester));
       }
 
@@ -429,15 +423,15 @@ const ViewTimeTable = () => {
     } else {
       // Extract batch year from the batch value (format: "YYYY-Section")
       const [batchYear, section] = value.split('-');
-      
+
       // Calculate and auto-select current semester
       const currentSemester = calculateCurrentSemester(batchYear);
-      
+
       // Log for debugging
       console.log('Selected batch:', value);
       console.log('Batch year:', batchYear);
       console.log('Calculated semester:', currentSemester);
-      
+
       setSelectedFilters(prev => ({
         ...prev,
         batch: value,
@@ -514,13 +508,13 @@ const ViewTimeTable = () => {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
-    
+
     // Calculate academic year - if current month is before June (6), we're still in the previous academic year
     const academicYear = currentMonth >= 6 ? currentYear : currentYear - 1;
-    
+
     // Calculate years since batch started
     const yearsSinceStart = academicYear - parseInt(batchYear);
-    
+
     // Calculate semester based on years and current month
     // If current month is June-December (6-12), it's odd semester (1, 3, 5, 7)
     // If current month is January-May (1-5), it's even semester (2, 4, 6, 8)
@@ -532,10 +526,10 @@ const ViewTimeTable = () => {
       // Even semester (January-June)
       semester = (yearsSinceStart * 2);
     }
-    
+
     // Ensure semester is within valid range (1-10 based on academicData)
     semester = Math.max(1, Math.min(10, semester));
-    
+
     // Return the semester in the same format as your academicData.semesters
     // Check if your semesters use roman numerals or numbers
     return semester.toString();
@@ -598,8 +592,8 @@ const ViewTimeTable = () => {
 
       {/* Controls */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex justify-between items-center">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex justify-between items-center rounded-t-2xl">
             <div>
               <h1 className="text-xl font-bold text-white">View Timetable</h1>
               <p className="text-indigo-100 text-sm mt-1">View academic schedules</p>
@@ -620,94 +614,65 @@ const ViewTimeTable = () => {
               {/* Course Select */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Course</label>
-                <Select
-                  value={selectedFilters.course ?? ""}
-                  onValueChange={handleCourseChange}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select course" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value="placeholder">Select course</SelectItem>
-                    {courses.map((course) => (
-                      <SelectItem key={course.ID} value={course.ID.toString()} className="rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{course.Name}</span>
-                          {course.Code && (
-                            <span className="text-xs text-gray-500">{course.Code}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={selectedFilters.course}
+                  onSelect={handleCourseChange}
+                  placeholder="Select course"
+                  disabled={loading}
+                  options={[
+                    { value: "placeholder", label: "" },
+                    ...courses.map((course) => ({
+                      value: course.ID.toString(),
+                      label: course.Name,
+                    })),
+                  ]}
+                />
               </div>
 
               {/* Batch Select */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Batch</label>
-                <Select
+                <SearchableSelect
                   disabled={!selectedFilters.course || loading}
-                  value={selectedFilters.batch ?? ""}
-                  onValueChange={handleBatchChange}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select batch" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value="placeholder">Select batch</SelectItem>
-                    {batches
-                      .filter(batch => {
-                        return selectedFilters.course ? batch.CourseID === parseInt(selectedFilters.course) : false;
-                      })
+                  value={selectedFilters.batch}
+                  onSelect={handleBatchChange}
+                  placeholder="Select batch"
+                  options={[
+                    { value: "placeholder", label: "" },
+                    ...batches
+                      .filter((batch) =>
+                        selectedFilters.course
+                          ? batch.CourseID === parseInt(selectedFilters.course)
+                          : false
+                      )
                       .sort((a, b) => {
                         if (a.Year !== b.Year) return a.Year - b.Year;
                         return a.Section.localeCompare(b.Section);
                       })
-                      .map((batch) => (
-                        <SelectItem
-                          key={batch.ID}
-                          value={`${batch.Year}-${batch.Section}`}
-                          className="rounded-lg"
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-medium">Batch {batch.Year} - Section {batch.Section}</span>
-                            {batch.Course?.Name && (
-                              <span className="text-xs text-gray-500">{batch.Course.Name}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                      .map((batch) => ({
+                        value: `${batch.Year}-${batch.Section}`,
+                        label: `Batch ${batch.Year} - Section ${batch.Section}`,
+                      })),
+                  ]}
+                />
               </div>
 
               {/* Semester Select */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Semester</label>
-                <Select
-                  value={selectedFilters.semester ?? ""}
-                  onValueChange={handleSemesterChange}
+                <SearchableSelect
+                  value={selectedFilters.semester}
+                  onSelect={handleSemesterChange}
                   disabled={!selectedFilters.batch}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select semester" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value="placeholder">Select semester</SelectItem>
-                    {semesters.map((semester) => (
-                      <SelectItem
-                        key={semester.id}
-                        value={semester.id || semester.number?.toString()}
-                        className="rounded-lg"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{semester.id || semester.number}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select semester"
+                  options={[
+                    { value: "placeholder", label: "" },
+                    ...semesters.map((semester) => ({
+                      value: semester.id || semester.number?.toString(),
+                      label: semester.id || semester.number.toString(),
+                    })),
+                  ]}
+                />
                 {isSemesterAutoSelected && selectedFilters.batch && selectedFilters.semester && (
                   <div className="text-xs text-indigo-600 flex items-center gap-1">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -721,60 +686,37 @@ const ViewTimeTable = () => {
               {/* Faculty Select */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Faculty</label>
-                <Select
-                  value={selectedFilters.faculty ?? ""}
-                  onValueChange={handleFacultyChange}
+                <SearchableSelect
+                  value={selectedFilters.faculty}
+                  onSelect={handleFacultyChange}
                   disabled={loading}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select faculty" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value="placeholder">Select faculty</SelectItem>
-                    {faculties.map((faculty) => (
-                      <SelectItem
-                        key={faculty.ID}
-                        value={faculty.ID.toString()}
-                        className="rounded-lg"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{faculty.Name}</span>
-                          {faculty.Email && (
-                            <span className="text-xs text-gray-500">{faculty.Email}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select faculty"
+                  options={[
+                    { value: "placeholder", label: "" },
+                    ...faculties.map((faculty) => ({
+                      value: faculty.ID.toString(),
+                      label: faculty.Name,
+                    })),
+                  ]}
+                />
               </div>
 
               {/* Room Select */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Room</label>
-                <Select
-                  value={selectedFilters.room ?? ""}
-                  onValueChange={handleRoomChange}
+                <SearchableSelect
+                  value={selectedFilters.room}
+                  onSelect={handleRoomChange}
                   disabled={loading}
-                >
-                  <SelectTrigger className="w-full h-12 border-2 border-gray-200 rounded-xl hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                    <SelectValue placeholder="Select room" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 shadow-lg">
-                    <SelectItem value="placeholder">Select room</SelectItem>
-                    {rooms.map((room) => (
-                      <SelectItem
-                        key={room.ID}
-                        value={room.ID.toString()}
-                        className="rounded-lg"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{room.Name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select room"
+                  options={[
+                    { value: "placeholder", label: "" },
+                    ...rooms.map((room) => ({
+                      value: room.ID.toString(),
+                      label: room.Name,
+                    })),
+                  ]}
+                />
               </div>
             </div>
 
@@ -964,80 +906,80 @@ const ViewTimeTable = () => {
                             <td className="border-r border-gray-200 p-4 font-bold text-indigo-700 bg-gradient-to-r from-indigo-50 to-blue-50 text-center">
                               {day}
                             </td>
-                          {allTimeSlots.map((time, timeIndex) => {
-                            const cellKey = `${day}-${time}`;
-                            const cellData = gridData[cellKey];
-                            const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
-                            const groupedLecture = groupedLectures[cellKey];
+                            {allTimeSlots.map((time, timeIndex) => {
+                              const cellKey = `${day}-${time}`;
+                              const cellData = gridData[cellKey];
+                              const lectures = Array.isArray(cellData) ? cellData : (cellData ? [cellData] : []);
+                              const groupedLecture = groupedLectures[cellKey];
 
-                            // Skip rendering if this is part of a group but not the first in the group
-                            if (groupedLecture?.isGrouped && groupedLecture.timeSlots[0] !== time) {
-                              return null;
-                            }
+                              // Skip rendering if this is part of a group but not the first in the group
+                              if (groupedLecture?.isGrouped && groupedLecture.timeSlots[0] !== time) {
+                                return null;
+                              }
 
-                            // Calculate colSpan for grouped lectures
-                            const colSpan = groupedLecture?.isGrouped
-                              ? groupedLecture.timeSlots.length
-                              : 1;
+                              // Calculate colSpan for grouped lectures
+                              const colSpan = groupedLecture?.isGrouped
+                                ? groupedLecture.timeSlots.length
+                                : 1;
 
-                            return (
-                              <td
-                                key={cellKey}
-                                className={clsx(
-                                  "border-r border-gray-200 p-3 text-center h-24 min-w-[140px]",
-                                  colSpan > 1 ? "bg-blue-50" : "",
-                                  lectures.length > 1 ? "bg-gradient-to-br from-indigo-50 to-purple-50" : ""
-                                )}
-                                colSpan={colSpan}
-                              >
-                                {lectures.length > 0 ? (
-                                  <div>
-                                    {lectures.map((lecture, index) => (
-                                      <div key={index}>
-                                        {index > 0 && (
-                                          <div className="flex items-center my-1">
-                                            <div className="flex-1 h-px bg-blue-400"></div>
-                                            <div className="px-1 text-xs text-blue-600 font-bold">•</div>
-                                            <div className="flex-1 h-px bg-blue-400"></div>
-                                          </div>
-                                        )}
-                                        <div className={`${lectures.length > 1 ? 'text-center' : ''}`}>
-                                          <div className="font-semibold text-indigo-700 text-sm leading-tight">
-                                            {lecture.subject}
-                                            {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
-                                          </div>
-                                          <div className="text-xs text-gray-600 font-medium">
-                                            {lecture.code}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {lecture.faculty}
-                                          </div>
-                                          {lecture.room && (
-                                            <div className="text-xs text-gray-400">
-                                              {lecture.room}
+                              return (
+                                <td
+                                  key={cellKey}
+                                  className={clsx(
+                                    "border-r border-gray-200 p-3 text-center h-24 min-w-[140px]",
+                                    colSpan > 1 ? "bg-blue-50" : "",
+                                    lectures.length > 1 ? "bg-gradient-to-br from-indigo-50 to-purple-50" : ""
+                                  )}
+                                  colSpan={colSpan}
+                                >
+                                  {lectures.length > 0 ? (
+                                    <div>
+                                      {lectures.map((lecture, index) => (
+                                        <div key={index}>
+                                          {index > 0 && (
+                                            <div className="flex items-center my-1">
+                                              <div className="flex-1 h-px bg-blue-400"></div>
+                                              <div className="px-1 text-xs text-blue-600 font-bold">•</div>
+                                              <div className="flex-1 h-px bg-blue-400"></div>
                                             </div>
                                           )}
+                                          <div className={`${lectures.length > 1 ? 'text-center' : ''}`}>
+                                            <div className="font-semibold text-indigo-700 text-sm leading-tight">
+                                              {lecture.subject}
+                                              {lectures.length > 1 && <span className="ml-1 text-xs text-gray-500">({index + 1})</span>}
+                                            </div>
+                                            <div className="text-xs text-gray-600 font-medium">
+                                              {lecture.code}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {lecture.faculty}
+                                            </div>
+                                            {lecture.room && (
+                                              <div className="text-xs text-gray-400">
+                                                {lecture.room}
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                    {colSpan > 1 && (
-                                      <div className="text-xs text-gray-400 mt-1">
-                                        {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  // This case should rarely occur now since we only show time slots with lectures
-                                  <div className="text-gray-400 text-sm font-medium">
-                                    No class
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
+                                      ))}
+                                      {colSpan > 1 && (
+                                        <div className="text-xs text-gray-400 mt-1">
+                                          {time.split('-')[0]} to {groupedLecture.timeSlots[groupedLecture.timeSlots.length - 1].split('-')[1]}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    // This case should rarely occur now since we only show time slots with lectures
+                                    <div className="text-gray-400 text-sm font-medium">
+                                      No class
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
